@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Delete build and bin directories if exists
 rm -rf ./build
 rm -rf ./bin
@@ -21,7 +23,10 @@ cd ..
 mkdir bin
 
 # Copy files
-cp ./build/web_server ./bin/web_server
+cp ./build/web-server ./bin/web-server
+cp ./build/web-server-ssl ./bin/web-server-ssl
+# Copy folders
+cp -r ./ssl ./bin/ssl
 cp -r ./src/html ./bin/html
 
 # Delete build directory if exist
