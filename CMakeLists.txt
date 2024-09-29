@@ -13,10 +13,15 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 # Define the source files
 set(SOURCES
-    ./src/web-server/request_handler.c
     ./src/utils/server_utils.c
+    ./src/utils/read_file.c
     ./src/main.c
     ./src/orchestrator.c
+    ./src/web-server/request_handler.c
+    ./src/modules/container/container.c
+    ./src/modules/menu/menu.c
+    ./src/modules/slider/slider.c
+    ./src/modules/blog_home/blog_home.c
 )
 
 # Add executable target
