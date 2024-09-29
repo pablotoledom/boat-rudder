@@ -155,17 +155,20 @@ void handle_request(int client_socket, const char *root_directory) {
                     char encoded_item_path[MAX_PATH_LENGTH];
 
                     // Build the element path
+                    size_t decoded_len = strlen(decoded_url);
                     if (strcmp(decoded_url, "/") == 0 || strcmp(decoded_url, "") == 0) {
-                        if (snprintf(item_path, sizeof(item_path), "/%s", entry->d_name) >= (int)sizeof(item_path)) {
-                            fprintf(stderr, "Path too long when building item_path\n");
-                            continue;
-                        }
+                        // We are at the root directory
+                        snprintf(item_path, sizeof(item_path), "/%s", entry->d_name);
                     } else {
-                        if (snprintf(item_path, sizeof(item_path), "%s/%s", decoded_url, entry->d_name) >= (int)sizeof(item_path)) {
-                            fprintf(stderr, "Path too long when building item_path\n");
-                            continue;
+                        // Check if decoded_url ends with '/'
+                        if (decoded_url[decoded_len - 1] == '/') {
+                            // Do not add extra '/'
+                            snprintf(item_path, sizeof(item_path), "%s%s", decoded_url, entry->d_name);
+                        } else {
+                            snprintf(item_path, sizeof(item_path), "%s/%s", decoded_url, entry->d_name);
                         }
                     }
+        
                     url_encode(encoded_item_path, item_path, sizeof(encoded_item_path));
 
                     // Add trailing slash if directory
@@ -179,8 +182,7 @@ void handle_request(int client_socket, const char *root_directory) {
                     }
 
                     struct stat entry_stat;
-                    if (stat(entry_full_path, &entry_stat) == 0 &&
-                        S_ISDIR(entry_stat.st_mode)) {
+                    if (stat(entry_full_path, &entry_stat) == 0 && S_ISDIR(entry_stat.st_mode)) {
                         strncat(display_name, "/", sizeof(display_name) - strlen(display_name) - 1);
                         strncat(encoded_item_path, "/", sizeof(encoded_item_path) - strlen(encoded_item_path) - 1);
                     }
