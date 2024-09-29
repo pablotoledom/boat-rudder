@@ -1,45 +1,37 @@
-cmake_minimum_required(VERSION 3.10)
+# Minimum CMake version required
+cmake_minimum_required(VERSION 3.5)
+
+# Project name and language
 project(BoatRudder)
 
-# Set the C standard to C11
-set(CMAKE_C_STANDARD 11)
+# Set the C standard
+set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-# Find the OpenSSL library
-find_package(OpenSSL REQUIRED)
+# Include directories
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-# Verify that OpenSSL was found
-if(NOT OpenSSL_FOUND)
-    message(FATAL_ERROR "OpenSSL not found!")
-endif()
-
-# Add the first executable (web-server) without SSL support
-add_executable(web-server ./src/web-server/server.c)
-
-# Include directories for web-server
-target_include_directories(web-server PRIVATE
-    ./src/web-server
+# Define the source files
+set(SOURCES
+    ./src/web-server/main.c
+    ./src/web-server/request_handler.c
+    ./src/web-server/utils.c
 )
 
-# Link libraries for web-server
-target_link_libraries(web-server PRIVATE
-    Threads::Threads
-)
+# Add executable target
+add_executable(web-server ${SOURCES})
 
-# Add the second executable (web-server-ssl) with SSL support
-add_executable(web-server-ssl ./src/web-server/server-ssl.c)
-
-# Include directories for web-server-ssl
-target_include_directories(web-server-ssl PRIVATE
-    ${OPENSSL_INCLUDE_DIRS}
-    ./src/web-server
-)
-
-# Link OpenSSL libraries for web-server-ssl
-target_link_libraries(web-server-ssl PRIVATE
-    ${OPENSSL_LIBRARIES}
-    Threads::Threads
-)
-
-# Find Threads package
+# Find Threads package for pthread
+set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
+
+# Link the pthread library
+target_link_libraries(web-server PRIVATE Threads::Threads)
+
+# Add compiler definitions for POSIX compliance
+target_compile_definitions(web-server PRIVATE
+    _XOPEN_SOURCE=700
+)
+
+# Add compiler options for warnings
+target_compile_options(web-server PRIVATE -Wall -Wextra)

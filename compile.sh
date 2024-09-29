@@ -24,7 +24,7 @@ mkdir bin
 
 # Copy files
 cp ./build/web-server ./bin/web-server
-cp ./build/web-server-ssl ./bin/web-server-ssl
+# cp ./build/web-server-ssl ./bin/web-server-ssl
 # Copy folders
 cp -r ./ssl ./bin/ssl
 cp -r ./src/html ./bin/html
