@@ -2,6 +2,8 @@
 
 # Run server, with or not SSL
 
-./bin/web-server ./bin/html
+cd ./bin
+./web-server ./html
+cd ..
 
 # ./bin/web-server-ssl ./bin/html
