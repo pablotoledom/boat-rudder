@@ -7,8 +7,31 @@
 #include "modules/menu/menu.h"
 #include "modules/slider/slider.h"
 #include "modules/blog_home/blog_home.h"
+#include "api/google_sheets_api.h"
+#include "include/json_parser.h"
+
 
 const char* buildWebSite() {
+    // Get menú
+    const char *spreadsheet_id = "1kOHas0XqFkiHdaE4RpWgB4dvNL731EnuGEIBkKpaRGw";
+    const char *range = "PagesContent!A3:C20";  // Example range
+    const char *api_key = "AIzaSyBMp9XaDQ8V4Rn6hU6TjI_mUSTqZg_RA0Y";  // Replace with your actual API key
+
+    // Fetch data from Google Sheets
+    char *json_data = fetch_google_sheets_data(spreadsheet_id, range, api_key);
+    if (json_data != NULL) {
+        printf("Data fetched from Google Sheets:\n%s\n", json_data);
+
+        // Parse the JSON data
+        parse_json(json_data);
+
+        // Free the fetched data
+        free(json_data);
+    } else {
+        printf("Failed to fetch data from Google Sheets.\n");
+    }
+
+
     // Get the HTML content from the container module (template with two %s placeholders)
     const char *response_container = container();  // Assume it contains two %s placeholders
     const char *response_menu = menu();  // HTML content for the menu

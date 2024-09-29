@@ -15,6 +15,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 set(SOURCES
     ./src/utils/server_utils.c
     ./src/utils/read_file.c
+    ./src/utils/json_parser.c
     ./src/main.c
     ./src/orchestrator.c
     ./src/web-server/request_handler.c
@@ -22,10 +23,19 @@ set(SOURCES
     ./src/modules/menu/menu.c
     ./src/modules/slider/slider.c
     ./src/modules/blog_home/blog_home.c
+    ./src/api/google_sheets_api.c
 )
 
 # Add executable target
 add_executable(web-server ${SOURCES})
+
+# Find and link libcurl
+find_package(CURL REQUIRED)
+target_link_libraries(web-server PRIVATE CURL::libcurl)
+
+# Find and link cJSON
+find_library(CJSON_LIB cjson)
+target_link_libraries(web-server PRIVATE ${CJSON_LIB})
 
 # Find Threads package for pthread
 set(THREADS_PREFER_PTHREAD_FLAG ON)
