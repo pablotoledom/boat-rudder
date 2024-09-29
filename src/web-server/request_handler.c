@@ -1,7 +1,8 @@
 #define _XOPEN_SOURCE 700  // Define POSIX.1-2008 compliance level
 
-#include "include/request_handler.h"
-#include "include/utils.h"
+#include "../include/request_handler.h"
+#include "../include/orchestrator.h"
+#include "../include/server_utils.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
@@ -11,7 +12,6 @@
 #include <stdlib.h>
 #include <stdint.h>    // For intmax_t
 #include <inttypes.h>  // For PRIdMAX
-#include <errno.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <limits.h>    // For PATH_MAX
@@ -65,6 +65,15 @@ void handle_request(int client_socket, const char *root_directory) {
     // Decode the URL
     char decoded_url[256];
     url_decode(decoded_url, url);
+
+    // Check if the client is accessing the root directory
+    if (strcmp(decoded_url, "/") == 0 || strcmp(decoded_url, "") == 0) {
+    // Respond with the welcome page using the function from orchestrator.c
+    const char *response = buildWebSite();
+    write(client_socket, response, strlen(response));
+    close(client_socket);
+    return;
+}
 
     // Prevent directory traversal attacks and resolve the safe path
     char safe_path[MAX_PATH_LENGTH];

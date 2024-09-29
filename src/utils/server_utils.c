@@ -1,6 +1,6 @@
 #define _XOPEN_SOURCE 700  // Define POSIX.1-2008 compliance level
 
-#include "include/utils.h"
+#include "../include/server_utils.h"
 #include <string.h>
 #include <ctype.h>
 #include <stdio.h>
