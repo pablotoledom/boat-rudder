@@ -8,11 +8,11 @@
 // Function to read a text file and load its content into a dynamically allocated string
 char* read_file_to_string(const char* filename) {
      char cwd[1024];
-    if (getcwd(cwd, sizeof(cwd)) != NULL) {
-        printf("Current working directory: %s\n", cwd);
-    } else {
-        perror("getcwd() error");
-    }
+    // if (getcwd(cwd, sizeof(cwd)) != NULL) {
+    //     // printf("Current working directory: %s\n", cwd);
+    // } else {
+    //     perror("getcwd() error");
+    // }
     // Open the file in read mode
     FILE *file = fopen(filename, "r");
 

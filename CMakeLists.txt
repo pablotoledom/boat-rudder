@@ -24,6 +24,8 @@ set(SOURCES
     ./src/modules/slider/slider.c
     ./src/modules/blog_home/blog_home.c
     ./src/api/google_sheets_api.c
+    ./src/api/data_fetcher.c
+    ./src/api/route.c
 )
 
 # Add executable target
