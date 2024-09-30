@@ -42,6 +42,8 @@ else()
     message(FATAL_ERROR "Could not find CURL library and headers")
 endif()
 
+include_directories(./src/include/cjson)
+
 # Find and link cJSON
 find_library(CJSON_LIB cjson)
 if(CJSON_LIB)
