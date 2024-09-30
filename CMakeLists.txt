@@ -31,17 +31,22 @@ set(SOURCES
 # Add executable target
 add_executable(web-server ${SOURCES})
 
-set(CURL_INCLUDE_DIR /usr/include)
-set(CURL_LIBRARY /usr/lib64/libcurl.so)
-
-# Find and link libcurl
+# Find CURL package
 find_package(CURL REQUIRED)
+
 if(CURL_FOUND)
-    include_directories(${CURL_INCLUDE_DIR})
-    target_link_libraries(web-server ${CURL_LIBRARY})
+    message(STATUS "CURL found: ${CURL_VERSION_STRING}")
+    message(STATUS "CURL include dir: ${CURL_INCLUDE_DIRS}")
+    message(STATUS "CURL library: ${CURL_LIBRARIES}")
 else()
-    message(FATAL_ERROR "Could not find CURL library and headers")
+    message(FATAL_ERROR "Could not find CURL")
 endif()
+
+# Include the CURL headers
+include_directories(${CURL_INCLUDE_DIRS})
+
+# Link the CURL library
+target_link_libraries(web-server ${CURL_LIBRARIES})
 
 # Find Threads package for pthread
 find_package(Threads REQUIRED)
