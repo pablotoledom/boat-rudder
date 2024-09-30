@@ -1,12 +1,11 @@
 # Minimum CMake version required
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 2.8.12)
 
 # Project name and language
-project(BoatRudder)
+project(BoatRudder C)
 
 # Set the C standard
-set(CMAKE_C_STANDARD 99)
-set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
 
 # Include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
@@ -33,23 +32,29 @@ add_executable(web-server ${SOURCES})
 
 # Find and link libcurl
 find_package(CURL REQUIRED)
-target_link_libraries(web-server PRIVATE CURL::libcurl)
+if(CURL_FOUND)
+    target_link_libraries(web-server ${CURL_LIBRARIES})
+endif()
 
 # Find and link cJSON
 find_library(CJSON_LIB cjson)
-target_link_libraries(web-server PRIVATE ${CJSON_LIB})
+if(CJSON_LIB)
+    target_link_libraries(web-server ${CJSON_LIB})
+endif()
 
 # Find Threads package for pthread
-set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
-
-# Link the pthread library
-target_link_libraries(web-server PRIVATE Threads::Threads)
+if(THREADS_HAVE_PTHREAD_ARG)
+    target_compile_options(web-server PRIVATE "-pthread")
+endif()
+if(CMAKE_THREAD_LIBS_INIT)
+    target_link_libraries(web-server "${CMAKE_THREAD_LIBS_INIT}")
+endif()
 
 # Add compiler definitions for POSIX compliance
-target_compile_definitions(web-server PRIVATE
-    _XOPEN_SOURCE=700
-)
+add_definitions(-D_XOPEN_SOURCE=700)
 
 # Add compiler options for warnings
-target_compile_options(web-server PRIVATE -Wall -Wextra)
+if(CMAKE_COMPILER_IS_GNUCC)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
+endif()
