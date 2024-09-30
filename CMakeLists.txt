@@ -30,10 +30,16 @@ set(SOURCES
 # Add executable target
 add_executable(web-server ${SOURCES})
 
+set(CURL_INCLUDE_DIR /usr/include)
+set(CURL_LIBRARY /usr/lib64/libcurl.so)
+
 # Find and link libcurl
 find_package(CURL REQUIRED)
 if(CURL_FOUND)
-    target_link_libraries(web-server ${CURL_LIBRARIES})
+    include_directories(${CURL_INCLUDE_DIR})
+    target_link_libraries(web-server ${CURL_LIBRARY})
+else()
+    message(FATAL_ERROR "Could not find CURL library and headers")
 endif()
 
 # Find and link cJSON
