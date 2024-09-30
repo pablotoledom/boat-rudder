@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <cjson/cJSON.h>  // Include cJSON for JSON parsing
+#include "cJSON/cJSON.h"  // Include cJSON for JSON parsing
 #include "../include/json_parser.h"
 
 void parse_json(const char *json_data) {

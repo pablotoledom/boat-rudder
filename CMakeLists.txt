@@ -15,7 +15,7 @@ set(SOURCES
     ./src/utils/server_utils.c
     ./src/utils/read_file.c
     ./src/utils/json_parser.c
-    # ./src/utils/cJSON/cJSON.c
+    ./src/utils/cJSON/cJSON.c
     ./src/main.c
     ./src/orchestrator.c
     ./src/web-server/request_handler.c

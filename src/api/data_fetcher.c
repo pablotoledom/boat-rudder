@@ -1,7 +1,7 @@
 #define _XOPEN_SOURCE 700 // Define POSIX.1-2008 compliance level
 
 #include "data_fetcher.h"
-#include "cjson/cJSON.h"
+#include "../utils/cJSON/cJSON.h"
 #include "google_sheets_api.h"
 #include <stdio.h>
 #include <stdlib.h>
