@@ -15,6 +15,7 @@ set(SOURCES
     ./src/utils/server_utils.c
     ./src/utils/read_file.c
     ./src/utils/json_parser.c
+    # ./src/utils/cJSON/cJSON.c
     ./src/main.c
     ./src/orchestrator.c
     ./src/web-server/request_handler.c
@@ -40,14 +41,6 @@ if(CURL_FOUND)
     target_link_libraries(web-server ${CURL_LIBRARY})
 else()
     message(FATAL_ERROR "Could not find CURL library and headers")
-endif()
-
-include_directories(./src/include/cjson)
-
-# Find and link cJSON
-find_library(CJSON_LIB cjson)
-if(CJSON_LIB)
-    target_link_libraries(web-server ${CJSON_LIB})
 endif()
 
 # Find Threads package for pthread
