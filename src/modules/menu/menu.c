@@ -16,11 +16,6 @@ const char *menu() {
   int routeCount = 0;
   Route *routes = getRoutes(&routeCount);
 
-  // for (int i = 0; i < routeCount; i++) {
-  //   printf("Route %s: %s (%s)\n", routes[i].id, routes[i].name,
-  //   routes[i].link);
-  // }
-
   // Buffer to hold all rows
   char *rowsBuffer = NULL;
   size_t rowsBufferSize = 0;
@@ -28,8 +23,8 @@ const char *menu() {
   // Generate the menu routes
   for (int i = 0; i < routeCount; i++) {
     char itemBuffer[512]; // Buffer to hold a single <td> element
-    snprintf(itemBuffer, sizeof(itemBuffer), menu_item_response, routes[i].name,
-             routes[i].link);
+    snprintf(itemBuffer, sizeof(itemBuffer), menu_item_response, routes[i].link,
+             routes[i].name);
 
     // Reallocate memory to concatenate each row into the rowsBuffer
     size_t itemLength = strlen(itemBuffer);

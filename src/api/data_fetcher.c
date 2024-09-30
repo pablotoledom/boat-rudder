@@ -1,7 +1,6 @@
 #define _XOPEN_SOURCE 700 // Define POSIX.1-2008 compliance level
 
 #include "data_fetcher.h"
-#include "../include/json_parser.h"
 #include "cjson/cJSON.h"
 #include "google_sheets_api.h"
 #include <stdio.h>
@@ -18,61 +17,59 @@ const char *api_key =
 char ***getData() {
   // Fetch data from Google Sheets
   char *json_data = fetch_google_sheets_data(spreadsheet_id, range, api_key);
-  if (json_data != NULL) {
-    printf("Data fetched from Google Sheets:\n%s\n", json_data);
-
-    // Parse the JSON data
-    parse_json(json_data);
-
-    // Free the fetched data
-    free(json_data);
-  } else {
+  if (json_data == NULL) {
     printf("Failed to fetch data from Google Sheets.\n");
-  }
-
-  // Parse the JSON data
-  cJSON *root = cJSON_Parse(json_data);
-  free(json_data); // Free the raw JSON string after parsing
-  if (!root) {
-    perror("Failed to parse JSON");
     return NULL;
   }
 
-  // Get the array of routes
-  cJSON *routesArray = cJSON_GetObjectItem(root, "routes");
-  if (!cJSON_IsArray(routesArray)) {
+  // printf("Data fetched from Google Sheets:\n%s\n", json_data);
+
+  // Parse the JSON data
+  cJSON *root = cJSON_Parse(json_data);
+  if (root == NULL) {
+    perror("Failed to parse JSON");
+    free(json_data); // Free the raw JSON string only once here
+    return NULL;
+  }
+
+  // Get the "values" array
+  cJSON *valuesArray = cJSON_GetObjectItem(root, "values");
+  if (!cJSON_IsArray(valuesArray)) {
     cJSON_Delete(root);
-    perror("Routes array is not found or is invalid");
+    free(json_data); // Free the JSON data
+    perror("Values array is not found or is invalid");
     return NULL;
   }
 
   // Get the number of items in the array
-  int routeCount = cJSON_GetArraySize(routesArray);
+  int rowCount = cJSON_GetArraySize(valuesArray);
 
   // Allocate memory for the 2D array
-  char ***result = (char ***)malloc(routeCount * sizeof(char **));
-  if (!result) {
+  char ***result = (char ***)malloc(rowCount * sizeof(char **));
+  if (result == NULL) {
     cJSON_Delete(root);
+    free(json_data); // Free the JSON data
     perror("Failed to allocate memory for routes");
     return NULL;
   }
 
-  // Iterate over the array and extract each route's details
-  for (int i = 0; i < routeCount; i++) {
-    cJSON *route = cJSON_GetArrayItem(routesArray, i);
-    if (!cJSON_IsArray(route)) {
+  // Iterate over the "values" array and extract each row's details
+  for (int i = 0; i < rowCount; i++) {
+    cJSON *row = cJSON_GetArrayItem(valuesArray, i);
+    if (!cJSON_IsArray(row)) {
       continue;
     }
 
     // Allocate memory for each row (id, name, link)
     result[i] = (char **)malloc(3 * sizeof(char *));
-    result[i][0] = strdup(cJSON_GetArrayItem(route, 0)->valuestring); // id
-    result[i][1] = strdup(cJSON_GetArrayItem(route, 1)->valuestring); // name
-    result[i][2] = strdup(cJSON_GetArrayItem(route, 2)->valuestring); // link
+    result[i][0] = strdup(cJSON_GetArrayItem(row, 0)->valuestring); // id
+    result[i][1] = strdup(cJSON_GetArrayItem(row, 1)->valuestring); // name
+    result[i][2] = strdup(cJSON_GetArrayItem(row, 2)->valuestring); // link
   }
 
-  // Clean up the JSON object
+  // Clean up the JSON object and the raw JSON string
   cJSON_Delete(root);
+  free(json_data); // Free the JSON data after we're done with it
 
   return result;
 }
