@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <curl/curl.h>
+#include "../utils/curl/curl.h"
 #include "google_sheets_api.h"
 
 // Struct to hold response data from Google Sheets API

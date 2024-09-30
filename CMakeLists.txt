@@ -31,17 +31,8 @@ set(SOURCES
 # Add executable target
 add_executable(web-server ${SOURCES})
 
-set(CURL_INCLUDE_DIR /usr/include)
-set(CURL_LIBRARY /usr/lib64/libcurl.so)
-
-# Find and link libcurl
-find_package(CURL REQUIRED)
-if(CURL_FOUND)
-    include_directories(${CURL_INCLUDE_DIR})
-    target_link_libraries(web-server ${CURL_LIBRARY})
-else()
-    message(FATAL_ERROR "Could not find CURL library and headers")
-endif()
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/utils/curl)
+target_link_libraries(web-server ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/libcurl.so)
 
 # Find Threads package for pthread
 find_package(Threads REQUIRED)
