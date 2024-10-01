@@ -1,14 +1,19 @@
+// route.h
+
 #ifndef ROUTE_H
 #define ROUTE_H
 
-// Define the Route structure
+#define MAX_ID_LENGTH 64
+#define MAX_NAME_LENGTH 128
+#define MAX_LINK_LENGTH 256
+
 typedef struct {
-    char id[10];
-    char name[50];
-    char link[100];
+    char id[MAX_ID_LENGTH];
+    char name[MAX_NAME_LENGTH];
+    char link[MAX_LINK_LENGTH];
 } Route;
 
-// Function to get the routes
-Route* getRoutes(int* routeCount);
+// Función prototipo
+Route *getRoutes(int *routeCount);
 
 #endif // ROUTE_H

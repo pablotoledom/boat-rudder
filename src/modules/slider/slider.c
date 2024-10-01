@@ -2,7 +2,7 @@
 
 #include "../../include/read_file.h"
 
-const char* slider() {
+const char *slider() {
     const char *slider_response =  read_file_to_string("./html/slider/slider_std2.html");
     
     return slider_response;

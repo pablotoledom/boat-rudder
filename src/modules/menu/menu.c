@@ -7,59 +7,92 @@
 #include <string.h>
 
 const char *menu() {
-  // Get templates
-  const char *menu_response = read_file_to_string("./html/menu/menu_std2.html");
-  const char *menu_item_response =
-      read_file_to_string("./html/menu/menu_item_std2.html");
+    // Get templates
+    const char *menu_response = read_file_to_string("./html/menu/menu_std2.html");
+    const char *menu_item_response =
+        read_file_to_string("./html/menu/menu-item_std2.html");
 
-  // Get menu
-  int routeCount = 0;
-  Route *routes = getRoutes(&routeCount);
-
-  // Buffer to hold all rows
-  char *rowsBuffer = NULL;
-  size_t rowsBufferSize = 0;
-
-  // Generate the menu routes
-  for (int i = 0; i < routeCount; i++) {
-    char itemBuffer[512]; // Buffer to hold a single <td> element
-    snprintf(itemBuffer, sizeof(itemBuffer), menu_item_response, routes[i].link,
-             routes[i].name);
-
-    // printf("itemBuffer: %s\n", itemBuffer);
-
-    // Reallocate memory to concatenate each row into the rowsBuffer
-    size_t itemLength = strlen(itemBuffer);
-    rowsBuffer = realloc(rowsBuffer, rowsBufferSize + itemLength +
-                                         1); // +1 for null terminator
-    if (rowsBuffer == NULL) {
-      perror("Failed to allocate memory for rowsBuffer");
-      return NULL;
+    if (!menu_response || !menu_item_response) {
+        perror("Failed to load HTML templates");
+        // Free allocated templates if any
+        if (menu_response) free((void *)menu_response);
+        if (menu_item_response) free((void *)menu_item_response);
+        return NULL;
     }
 
-    // Append the item to rowsBuffer
-    strcpy(rowsBuffer + rowsBufferSize, itemBuffer);
-    rowsBufferSize += itemLength;
-  }
+    // Get menu list
+    int routeCount = 0;
+    Route *routes = getRoutes(&routeCount);
 
-  // Allocate buffer for the full HTML table (including the table template)
-  size_t tableBufferSize = snprintf(NULL, 0, menu_response, rowsBuffer) +
-                           1; // +1 for null terminator
-  char *tableBuffer = malloc(tableBufferSize);
-  if (tableBuffer == NULL) {
-    perror("Failed to allocate memory for tableBuffer");
-    free(rowsBuffer); // Free the rowsBuffer before exiting
-    return NULL;
-  }
+    if (routes == NULL) {
+        perror("Failed to get routes");
+        free((void *)menu_response);
+        free((void *)menu_item_response);
+        return NULL;
+    }
 
-  // Format the final HTML table string
-  snprintf(tableBuffer, tableBufferSize, menu_response, rowsBuffer);
+    // Buffer to hold all items
+    char *itemsBuffer = NULL;
+    size_t itemsBufferSize = 0;
 
-  // Free the rowsBuffer as it's no longer needed
-  free(rowsBuffer);
+    // Generate the menu routes
+    for (int i = 0; i < routeCount; i++) {
+        char itemBuffer[512]; // Buffer to hold a single item
+        int itemLength = snprintf(itemBuffer, sizeof(itemBuffer), menu_item_response,
+                                  routes[i].link, routes[i].name);
 
-  // Free the routes
-  free(routes);
+        if (itemLength < 0) {
+            perror("Error formatting item");
+            free(itemsBuffer);
+            free(routes);
+            free((void *)menu_response);
+            free((void *)menu_item_response);
+            return NULL;
+        }
 
-  return tableBuffer;
+        // Reallocate memory for itemsBuffer
+        char *tempBuffer = realloc(itemsBuffer, itemsBufferSize + itemLength + 1); // +1 for null terminator
+        if (tempBuffer == NULL) {
+            perror("Failed to allocate memory for itemsBuffer");
+            free(itemsBuffer);
+            free(routes);
+            free((void *)menu_response);
+            free((void *)menu_item_response);
+            return NULL;
+        }
+
+        itemsBuffer = tempBuffer;
+
+        // Copy the new item into itemsBuffer
+        memcpy(itemsBuffer + itemsBufferSize, itemBuffer, itemLength);
+        itemsBufferSize += itemLength;
+        itemsBuffer[itemsBufferSize] = '\0'; // Null-terminate the string
+    }
+
+    // Allocate buffer for the full HTML content
+    size_t contentBufferSize = snprintf(NULL, 0, menu_response, itemsBuffer) + 1; // +1 for null terminator
+    char *contentBuffer = malloc(contentBufferSize);
+    if (contentBuffer == NULL) {
+        perror("Failed to allocate memory for contentBuffer");
+        free(itemsBuffer);
+        free(routes);
+        free((void *)menu_response);
+        free((void *)menu_item_response);
+        return NULL;
+    }
+
+    // Format the final HTML content
+    snprintf(contentBuffer, contentBufferSize, menu_response, itemsBuffer);
+
+    // Free the itemsBuffer as it's no longer needed
+    free(itemsBuffer);
+
+    // Free the routes
+    free(routes);
+
+    // Free the templates
+    free((void *)menu_response);
+    free((void *)menu_item_response);
+
+    return contentBuffer;
 }

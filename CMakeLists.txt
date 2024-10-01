@@ -24,10 +24,11 @@ set(SOURCES
     ./src/modules/container/container.c
     ./src/modules/menu/menu.c
     ./src/modules/slider/slider.c
-    ./src/modules/blog_home/blog_home.c
+    ./src/modules/home_blog/home_blog.c
     ./src/api/google_sheets_api.c
     ./src/api/data_fetcher.c
     ./src/api/route.c
+    ./src/api/home_blog_items.c
 )
 
 # Add executable target
