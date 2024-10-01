@@ -5,6 +5,7 @@
 #include <string.h>
 #include "../utils/curl/curl.h"
 #include "google_sheets_api.h"
+#include "../include/config_loader.h"
 
 // Struct to hold response data from Google Sheets API
 struct memory {
@@ -32,7 +33,7 @@ static size_t write_callback(void *data, size_t size, size_t nmemb, void *userp)
 }
 
 // Function to fetch data from Google Sheets
-char* fetch_google_sheets_data(const char* spreadsheet_id, const char* range, const char* api_key) {
+char* fetch_google_sheets_data(const char* range) {
     CURL *curl;
     CURLcode res;
     struct memory chunk = { .response = NULL, .size = 0 };

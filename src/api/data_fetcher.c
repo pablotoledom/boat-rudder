@@ -2,7 +2,6 @@
 
 #include "data_fetcher.h"
 #include "../utils/cJSON/cJSON.h"
-#include "../include/config_loader.h"
 #include "google_sheets_api.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,24 +13,18 @@ char ***getData(const char *sheetName, const char *startCell,
   // Build query
   int size = snprintf(NULL, 0, "%s!%s:%s", sheetName, startCell, endCell) + 1;
 
-  // Asignar memoria para la cadena resultante
+  // Allocate memory for the resulting string
   char *range = (char *)malloc(size * sizeof(char));
   if (range == NULL) {
     perror("Failed to allocate memory");
-    exit(1); // Terminar el programa si no hay suficiente memoria
+    exit(1); // Terminate the program if there is not enough memory
   }
 
-  // Formatear la cadena
+  // Format the string
   snprintf(range, size, "%s!%s:%s", sheetName, startCell, endCell);
 
-  char spreadsheet_id[128];
-    char api_key[128];
-
-    // Cargar las configuraciones desde config.txt
-    load_config(spreadsheet_id, api_key);
-
   // Fetch data from Google Sheets
-  char *json_data = fetch_google_sheets_data(spreadsheet_id, range, api_key);
+  char *json_data = fetch_google_sheets_data(range);
   if (json_data == NULL) {
     printf("Failed to fetch data from Google Sheets.\n");
     return NULL;

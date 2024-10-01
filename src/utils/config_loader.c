@@ -3,25 +3,57 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
+#include "../include/config_loader.h"
 
-// Function to load configurations from googlesheets.txt
-void load_config(char *spreadsheet_id, char *api_key) {
-    FILE *file = fopen("./configs/googlesheets.txt", "r");
+// Define global variables
+bool verbose = false;  // Default is disabled
+int server_port = 0;  // Default value for the port
+char spreadsheet_id[128] = {0};  // Initialize as an empty string
+char api_key[128] = {0};  // Initialize as an empty string
+
+// Implementation of load_config
+int load_config(const char *filename) {
+    FILE *file = fopen(filename, "r");
     if (file == NULL) {
         perror("Failed to open config file");
-        exit(1);
+        return -1;  // Error opening the file
     }
 
     char line[256];
     while (fgets(line, sizeof(line), file)) {
-        if (strncmp(line, "spreadsheet_id=", 15) == 0) {
-            strcpy(spreadsheet_id, line + 15);
-            spreadsheet_id[strcspn(spreadsheet_id, "\n")] = 0;  // Remove newline
-        } else if (strncmp(line, "api_key=", 8) == 0) {
-            strcpy(api_key, line + 8);
-            api_key[strcspn(api_key, "\n")] = 0;  // Remove newline
+        // Ignore empty lines or comments
+        if (line[0] == '\n' || line[0] == '#') {
+            continue;
+        }
+
+        // Look for '=' to split key and value
+        char *delimiter = strchr(line, '=');
+        if (delimiter == NULL) {
+            continue;  // If there is no '=', it's not a valid line
+        }
+
+        *delimiter = '\0';  // Replace '=' with the null terminator
+        char *key = line;
+        char *value = delimiter + 1;
+
+        // Remove newline characters from the value
+        value[strcspn(value, "\n")] = '\0';
+
+        // Assign values based on the key
+        if (strcmp(key, "verbose") == 0) {
+            verbose = (strcmp(value, "true") == 0);  // true if it's "true", false otherwise
+        } else if (strcmp(key, "server_port") == 0) {
+            server_port = atoi(value);  // Convert to integer
+        } else if (strcmp(key, "spreadsheet_id") == 0) {
+            strncpy(spreadsheet_id, value, sizeof(spreadsheet_id) - 1);
+            spreadsheet_id[sizeof(spreadsheet_id) - 1] = '\0';  // Ensure null terminator
+        } else if (strcmp(key, "api_key") == 0) {
+            strncpy(api_key, value, sizeof(api_key) - 1);
+            api_key[sizeof(api_key) - 1] = '\0';  // Ensure null terminator
         }
     }
 
     fclose(file);
+    return 0;
 }

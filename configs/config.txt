@@ -1,2 +1,4 @@
+verbose=true
+server_port=8080
 spreadsheet_id=YOUR_GOOGLE_SHEET_DOCUMENT_ID
 api_key=YOUR_GOOGLE_SHEET_DOCUMENT_API_KEY
