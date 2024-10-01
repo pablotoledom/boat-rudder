@@ -11,8 +11,13 @@ char *read_file_to_string(const char *filename) {
   // Open the file in read mode
   FILE *file = fopen(filename, "r");
 
+  char error_msg[256];
+
+  // Generar el string con el mensaje que deseas
+  snprintf(error_msg, sizeof(error_msg), "\nFailed to open file: %s", filename);
+
   if (file == NULL) {
-    perror("Failed to open file");
+    perror(error_msg);
     return NULL;
   }
 

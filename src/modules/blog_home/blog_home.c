@@ -3,7 +3,7 @@
 #include "../../include/read_file.h"
 
 const char* blog_home() {
-    const char *blog_home_response =  read_file_to_string("./html/blog-home.html");
+    const char *blog_home_response =  read_file_to_string("./html/blog-home/blog-home_std2.html");
     
     return blog_home_response;
 }

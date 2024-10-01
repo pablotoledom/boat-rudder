@@ -3,7 +3,7 @@
 #include "../../include/read_file.h"
 
 const char* container() {
-    char *container_content = read_file_to_string("./html/container.html");
+    char *container_content = read_file_to_string("./html/container/container_std2.html");
 
     return container_content;
 }

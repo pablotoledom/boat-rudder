@@ -8,9 +8,9 @@
 
 const char *menu() {
   // Get templates
-  const char *menu_response = read_file_to_string("./html/menu_template.html");
+  const char *menu_response = read_file_to_string("./html/menu/menu_std2.html");
   const char *menu_item_response =
-      read_file_to_string("./html/menu_item_template.html");
+      read_file_to_string("./html/menu/menu_item_std2.html");
 
   // Get menu
   int routeCount = 0;
