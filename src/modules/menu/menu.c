@@ -26,6 +26,8 @@ const char *menu() {
     snprintf(itemBuffer, sizeof(itemBuffer), menu_item_response, routes[i].link,
              routes[i].name);
 
+    // printf("itemBuffer: %s\n", itemBuffer);
+
     // Reallocate memory to concatenate each row into the rowsBuffer
     size_t itemLength = strlen(itemBuffer);
     rowsBuffer = realloc(rowsBuffer, rowsBufferSize + itemLength +

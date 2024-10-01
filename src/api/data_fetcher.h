@@ -1,9 +1,8 @@
 #ifndef DATA_FETCHER_H
 #define DATA_FETCHER_H
 
-// Simulate the getData function
-// This function returns a 2D array of strings, similar to what you'd get from TypeScript's getData.
-char*** getData();
+// This function returns a 2D array of strings
+char ***getData(const char *sheetName, const char *startCell, const char *endCell, int *rowCount);
 
 // Function to free the dynamically allocated data
 void freeData(char*** data, int rows);
