@@ -1,7 +1,6 @@
 #define _XOPEN_SOURCE 700 // Define POSIX.1-2008 compliance level
 
 #include "../../api/home_blog_items.h"
-#include "../../include/config_loader.h"
 #include "../../include/read_file.h"
 #include <stdio.h>
 #include <stdlib.h>
