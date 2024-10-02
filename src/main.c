@@ -1,6 +1,7 @@
 #define _XOPEN_SOURCE 700 // Define POSIX.1-2008 compliance level
 
 #include "include/config_loader.h"
+#include "include/log.h"
 #include "include/request_handler.h"
 #include <arpa/inet.h>
 #include <errno.h>
@@ -40,22 +41,18 @@ void *thread_function(void *arg) {
 }
 
 int main(int argc, char *argv[]) {
-
   // Load the configuration file
   if (load_config("./configs/config.txt") == 0) {
-    if (verbose) {
-      // Show loaded configurations
-      printf("Verbose mode is on.\n\n");
 
-      printf("Verbose: %s\n", verbose ? "true" : "false");
-      printf("Server Port: %d\n", server_port);
-      printf("Spreadsheet ID: %s\n", spreadsheet_id);
-      printf("API Key: %s\n\n", api_key);
-    } else {
-      printf("Verbose mode is off.\n\n");
-    }
+    log_level = verbose_level;
+
+    // Show loaded configurations
+    LOG_INFO("verbose_level: %d\n", verbose_level);
+    LOG_INFO("Server Port: %d\n", server_port);
+    LOG_DEBUG("Spreadsheet ID: %s\n", spreadsheet_id);
+    LOG_DEBUG("API Key: %s\n\n", api_key);
   } else {
-    printf("Error loading configuration.\n");
+    LOG_ERROR("Error loading configuration.");
   }
 
   int server_fd, client_socket;
@@ -72,25 +69,25 @@ int main(int argc, char *argv[]) {
   // Resolve the root directory
   char resolved_path[PATH_MAX];
   if (realpath(argv[1], resolved_path) == NULL) {
-    perror("Invalid root directory");
+    LOG_ERROR("Invalid root directory: %s", strerror(errno));
     exit(EXIT_FAILURE);
   }
   char *root_directory = strdup(resolved_path);
   if (root_directory == NULL) {
-    perror("Failed to allocate memory for root_directory");
+    LOG_ERROR("Failed to allocate memory for root_directory: %s", strerror(errno));
     exit(EXIT_FAILURE);
   }
 
   // Create the socket
   if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-    perror("Error creating socket");
+    LOG_ERROR("Error creating socket: %s", strerror(errno));
     free(root_directory);
     exit(EXIT_FAILURE);
   }
 
   // Configure socket options
   if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
-    perror("Error on setsockopt");
+    LOG_ERROR("Error on setsockopt: %s", strerror(errno));
     free(root_directory);
     close(server_fd);
     exit(EXIT_FAILURE);
@@ -103,7 +100,7 @@ int main(int argc, char *argv[]) {
 
   // Bind the socket to the specified port
   if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
-    perror("Error on bind");
+    LOG_ERROR("Error on bind: %s", strerror(errno));
     free(root_directory);
     close(server_fd);
     exit(EXIT_FAILURE);
@@ -111,7 +108,7 @@ int main(int argc, char *argv[]) {
 
   // Listen for incoming connections
   if (listen(server_fd, 10) < 0) {
-    perror("Error on listen");
+    LOG_ERROR("Error on listen: %s", strerror(errno));
     free(root_directory);
     close(server_fd);
     exit(EXIT_FAILURE);
@@ -123,27 +120,27 @@ int main(int argc, char *argv[]) {
   sigemptyset(&sa.sa_mask);
   sa.sa_flags = SA_RESTART;
   if (sigaction(SIGCHLD, &sa, NULL) == -1) {
-    perror("Error setting up signal handler");
+    LOG_ERROR("Error setting up signal handler: %s", strerror(errno));
     free(root_directory);
     close(server_fd);
     exit(EXIT_FAILURE);
   }
 
-  printf("Static HTTP server, listening on port %d\n", server_port);
-  printf("Root directory: %s\n", root_directory);
+  LOG_INFO("Static HTTP server, listening on port %d\n", server_port);
+  LOG_INFO("Root directory: %s\n", root_directory);
 
   while (1) {
     // Accept an incoming connection
     client_socket = accept(server_fd, (struct sockaddr *)&address, &addrlen);
     if (client_socket < 0) {
-      perror("Error on accept");
+      LOG_ERROR("Error on accept: %s", strerror(errno));
       continue;
     }
 
     // Handle the request in a new thread
     struct thread_args *args = malloc(sizeof(struct thread_args));
     if (!args) {
-      perror("Failed to allocate memory");
+      LOG_ERROR("Failed to allocate memory: %s", strerror(errno));
       close(client_socket);
       continue;
     }
@@ -152,7 +149,7 @@ int main(int argc, char *argv[]) {
 
     pthread_t thread_id;
     if (pthread_create(&thread_id, NULL, thread_function, (void *)args) != 0) {
-      perror("Could not create thread");
+      LOG_ERROR("Could not create thread: %s", strerror(errno));
       close(client_socket);
       free(args);
       continue;

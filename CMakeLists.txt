@@ -18,12 +18,14 @@ set(SOURCES
     ./src/utils/cJSON/cJSON.c
     ./src/utils/print_table.c
     ./src/utils/config_loader.c
+    ./src/utils/log.c
     ./src/main.c
     ./src/orchestrator.c
     ./src/web-server/request_handler.c
     ./src/modules/container/container.c
     ./src/modules/menu/menu.c
     ./src/modules/slider/slider.c
+    ./src/modules/blog/blog.c
     ./src/modules/home_blog/home_blog.c
     ./src/api/google_sheets_api.c
     ./src/api/data_fetcher.c

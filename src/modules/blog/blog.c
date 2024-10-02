@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-const char *home_blog() {
+const char *blog() {
     // Get templates
     const char *home_blog_response =
         read_file_to_string("./html/blog/home-blog/home-blog_std2.html");

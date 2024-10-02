@@ -1,5 +1,7 @@
 #define _XOPEN_SOURCE 700 // Define POSIX.1-2008 compliance level
 
+#include "include/log.h"
+#include "modules/blog/blog.h"
 #include "modules/container/container.h"
 #include "modules/home_blog/home_blog.h"
 #include "modules/menu/menu.h"
@@ -36,7 +38,7 @@ const char *buildHomeWebSite() {
                                  response_slider, response_home_blog) +
                         1; // +1 for null terminator
 
-  printf("Total length to allocate: %zu\n", total_length); // Debug output
+  LOG_DEBUG("Total length to allocate: %zu\n", total_length);
 
   // Allocate memory for the formatted response
   char *buffer = malloc(total_length);
@@ -128,7 +130,7 @@ const char *buildBlogWebSite() {
                         //  response_slider, response_home_blog) +
                         1; // +1 for null terminator
 
-  printf("Total length to allocate: %zu\n", total_length); // Debug output
+  LOG_DEBUG("Total length to allocate: %zu\n", total_length);
 
   // Allocate memory for the formatted response
   char *buffer = malloc(total_length);
@@ -197,11 +199,11 @@ const char *buildBlogEntryWebSite(const char *id) {
   const char *response_container = container();
   const char *response_menu = menu();
   //   const char *response_slider = slider();
-  const char *response_home_blog = home_blog();
+  const char *response_blog_entry = blog();
 
   // Check if any component returned NULL
   //   if (!response_container || !response_menu || !response_slider ||
-  if (!response_container || !response_menu || !response_home_blog) {
+  if (!response_container || !response_menu || !response_blog_entry) {
     printf("Error: One or more HTML components are NULL.\n");
     // Free allocated components if any
     if (response_container)
@@ -210,18 +212,18 @@ const char *buildBlogEntryWebSite(const char *id) {
       free((void *)response_menu);
     // if (response_slider)
     //   free((void *)response_slider);
-    if (response_home_blog)
-      free((void *)response_home_blog);
+    if (response_blog_entry)
+      free((void *)response_blog_entry);
     return NULL;
   }
 
   // Calculate the total size needed for the formatted string
   size_t total_length = snprintf(NULL, 0, response_container, response_menu, "",
-                                 response_home_blog) +
-                        //  response_slider, response_home_blog) +
+                                 response_blog_entry) +
+                        //  response_slider, response_blog_entry) +
                         1; // +1 for null terminator
 
-  printf("Total length to allocate: %zu\n", total_length); // Debug output
+  LOG_DEBUG("Total length to allocate: %zu\n", total_length);
 
   // Allocate memory for the formatted response
   char *buffer = malloc(total_length);
@@ -232,21 +234,21 @@ const char *buildBlogEntryWebSite(const char *id) {
     free((void *)response_container);
     free((void *)response_menu);
     // free((void *)response_slider);
-    free((void *)response_home_blog);
+    free((void *)response_blog_entry);
     return NULL;
   }
 
   // Format the string by replacing %s in response_container with other
   // components
   snprintf(buffer, total_length, response_container, response_menu, "",
-           response_home_blog);
-  //    response_slider, response_home_blog);
+           response_blog_entry);
+  //    response_slider, response_blog_entry);
 
   // Free the component strings as they are no longer needed
   free((void *)response_container);
   free((void *)response_menu);
   //   free((void *)response_slider);
-  free((void *)response_home_blog);
+  free((void *)response_blog_entry);
 
   // Calculate total size needed for HTTP headers + body
   size_t header_len = snprintf(NULL, 0,

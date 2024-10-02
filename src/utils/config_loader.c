@@ -7,7 +7,7 @@
 #include "../include/config_loader.h"
 
 // Define global variables
-bool verbose = false;  // Default is disabled
+int verbose_level = 0;  // Default is disabled
 int server_port = 0;  // Default value for the port
 char spreadsheet_id[128] = {0};  // Initialize as an empty string
 char api_key[128] = {0};  // Initialize as an empty string
@@ -41,8 +41,8 @@ int load_config(const char *filename) {
         value[strcspn(value, "\n")] = '\0';
 
         // Assign values based on the key
-        if (strcmp(key, "verbose") == 0) {
-            verbose = (strcmp(value, "true") == 0);  // true if it's "true", false otherwise
+        if (strcmp(key, "verbose_level") == 0) {
+            verbose_level = atoi(value); // Convert to integer
         } else if (strcmp(key, "server_port") == 0) {
             server_port = atoi(value);  // Convert to integer
         } else if (strcmp(key, "spreadsheet_id") == 0) {
