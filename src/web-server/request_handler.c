@@ -89,11 +89,32 @@ void handle_request(int client_socket, const char *root_directory) {
   //     return;
   //   }
 
-  // Verificar si la URL es exactamente "/blog" o "/"
-  if (strcmp(decoded_url, "/blog") == 0 || strcmp(decoded_url, "/") == 0 ||
+  // Verificar si la URL es exactamente "/"
+  if (strcmp(decoded_url, "/") == 0 ||
       strcmp(decoded_url, "") == 0) {
     // Responder con la página principal del blog
     const char *response = buildHomeWebSite();
+
+    if (response == NULL) {
+      // Manejar el error si la respuesta es NULL
+      const char *error_response = "HTTP/1.1 500 Internal Server Error\r\n"
+                                   "Content-Type: text/plain\r\n"
+                                   "Content-Length: 21\r\n"
+                                   "Connection: close\r\n"
+                                   "\r\n"
+                                   "Internal Server Error";
+      write(client_socket, error_response, strlen(error_response));
+    } else {
+      write(client_socket, response, strlen(response));
+      free((void *)response); // Liberar la memoria si es necesario
+    }
+    close(client_socket);
+    return;
+  }
+  // Verificar si la URL comienza con "/blog"
+  else if (strcmp(decoded_url, "/blog") == 0 || strcmp(decoded_url, "") == 0) {
+    // Responder con la página principal del blog
+    const char *response = buildBlogWebSite();
 
     if (response == NULL) {
       // Manejar el error si la respuesta es NULL
@@ -131,7 +152,7 @@ void handle_request(int client_socket, const char *root_directory) {
     }
 
     // Llamar a la función para generar la página del blog específico
-    const char *response = buildBlogWebSite();
+    const char *response = buildBlogEntryWebSite(id);
 
     if (response == NULL) {
       // Manejar el error si la respuesta es NULL

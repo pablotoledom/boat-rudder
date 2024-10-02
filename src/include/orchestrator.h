@@ -3,5 +3,6 @@
 
 const char* buildHomeWebSite();
 const char* buildBlogWebSite();
+const char* buildBlogEntryWebSite(const char *id);
 
 #endif // ORCHESTRATOR_H
