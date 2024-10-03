@@ -19,8 +19,7 @@ const char *buildHomeWebSite() {
   const char *html_home_blog = home_blog();
 
   // Check if any component returned NULL
-  if (!html_container || !html_menu || !html_slider ||
-      !html_home_blog) {
+  if (!html_container || !html_menu || !html_slider || !html_home_blog) {
     printf("Error: One or more HTML components are NULL.\n");
     // Free allocated components if any
     if (html_container)
@@ -56,8 +55,8 @@ const char *buildHomeWebSite() {
 
   // Format the string by replacing %s in html_container with other
   // components
-  snprintf(buffer, total_length, html_container, html_menu,
-           html_slider, html_home_blog);
+  snprintf(buffer, total_length, html_container, html_menu, html_slider,
+           html_home_blog);
 
   // Free the component strings as they are no longer needed
   free((void *)html_container);
@@ -143,8 +142,7 @@ const char *buildBlogWebSite() {
 
   // Format the string by replacing %s in html_container with other
   // components
-  snprintf(buffer, total_length, html_container, html_menu, "",
-           html_home_blog);
+  snprintf(buffer, total_length, html_container, html_menu, "", html_home_blog);
 
   // Free the component strings as they are no longer needed
   free((void *)html_container);

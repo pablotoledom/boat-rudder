@@ -40,7 +40,8 @@ BlogEntryItems *getBlogEntryItems(const char *EntryId, int *blogHomeCount) {
       (BlogEntryItems *)malloc(matchingRowCount * sizeof(BlogEntryItems));
   if (home_blog_list == NULL) {
     perror("Failed to allocate memory for home blog list");
-    freeData(responseList, totalRowCount); // Free responseList in case of failure
+    freeData(responseList,
+             totalRowCount); // Free responseList in case of failure
     *blogHomeCount = 0;
     return NULL;
   }

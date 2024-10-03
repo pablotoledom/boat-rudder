@@ -20,7 +20,8 @@ HomeBlogItems *getBlogItems(int *blogHomeCount) {
       (HomeBlogItems *)malloc(*blogHomeCount * sizeof(HomeBlogItems));
   if (home_blog_list == NULL) {
     perror("Failed to allocate memory for home blog list");
-    freeData(responseList, *blogHomeCount); // Free responseList in case of failure
+    freeData(responseList,
+             *blogHomeCount); // Free responseList in case of failure
     return NULL;
   }
 

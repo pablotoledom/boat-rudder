@@ -8,11 +8,11 @@
 #define MAX_EXTRA_DATA_LENGTH 50000
 
 typedef struct {
-    char entry_id[MAX_ID_LENGTH];
-    char content_id[MAX_CONTENT_ID_LENGTH];
-    char type[MAX_TYPE_LENGTH];
-    char content[MAX_CONTENT_LENGTH];
-    char extra_data[MAX_EXTRA_DATA_LENGTH];
+  char entry_id[MAX_ID_LENGTH];
+  char content_id[MAX_CONTENT_ID_LENGTH];
+  char type[MAX_TYPE_LENGTH];
+  char content[MAX_CONTENT_LENGTH];
+  char extra_data[MAX_EXTRA_DATA_LENGTH];
 } BlogEntryItems;
 
 // Function prototype const char *EntryId,

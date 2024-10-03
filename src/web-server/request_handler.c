@@ -67,36 +67,14 @@ void handle_request(int client_socket, const char *root_directory) {
   char decoded_url[256];
   url_decode(decoded_url, url);
 
-  // Check if the client is accessing the home directory
-  //   if (strcmp(decoded_url, "/") == 0 || strcmp(decoded_url, "") == 0) {
-
-  //     // Respond with the welcome page using the function from orchestrator.c
-  //     const char *response = buildHomeWebSite();
-
-  //     write(client_socket, response, strlen(response));
-  //     close(client_socket);
-  //     return;
-  //   }
-
-  //   // Check if the client is accessing the home directory
-  //   if (strcmp(decoded_url, "/blog") == 0 || strcmp(decoded_url, "") == 0) {
-
-  //     // Respond with the welcome page using the function from orchestrator.c
-  //     const char *response = buildBlogWebSite();
-
-  //     write(client_socket, response, strlen(response));
-  //     close(client_socket);
-  //     return;
-  //   }
-
-  // Verificar si la URL es exactamente "/"
+  // Check if the URL is exactly "/"
   if (strcmp(decoded_url, "/") == 0 ||
       strcmp(decoded_url, "") == 0) {
-    // Responder con la página principal del blog
+    // Reply with the blogs name page
     const char *response = buildHomeWebSite();
 
     if (response == NULL) {
-      // Manejar el error si la respuesta es NULL
+      // Handle error if response is NULL
       const char *error_response = "HTTP/1.1 500 Internal Server Error\r\n"
                                    "Content-Type: text/plain\r\n"
                                    "Content-Length: 21\r\n"
@@ -106,18 +84,18 @@ void handle_request(int client_socket, const char *root_directory) {
       write(client_socket, error_response, strlen(error_response));
     } else {
       write(client_socket, response, strlen(response));
-      free((void *)response); // Liberar la memoria si es necesario
+      free((void *)response); // Freeing the memory if is necesary
     }
     close(client_socket);
     return;
   }
-  // Verificar si la URL comienza con "/blog"
+  // Check if the URL is exactly "/blog"
   else if (strcmp(decoded_url, "/blog") == 0 || strcmp(decoded_url, "") == 0) {
     // Responder con la página principal del blog
     const char *response = buildBlogWebSite();
 
     if (response == NULL) {
-      // Manejar el error si la respuesta es NULL
+      // Handle error if response is NULL
       const char *error_response = "HTTP/1.1 500 Internal Server Error\r\n"
                                    "Content-Type: text/plain\r\n"
                                    "Content-Length: 21\r\n"
@@ -127,19 +105,19 @@ void handle_request(int client_socket, const char *root_directory) {
       write(client_socket, error_response, strlen(error_response));
     } else {
       write(client_socket, response, strlen(response));
-      free((void *)response); // Liberar la memoria si es necesario
+      free((void *)response); // Freeing the memory if is necesary
     }
     close(client_socket);
     return;
   }
-  // Verificar si la URL comienza con "/blog/"
+  // Check if the URL start with "/blog/"
   else if (strncmp(decoded_url, "/blog/", 6) == 0) {
-    // Extraer el identificador después de "/blog/"
-    const char *id = decoded_url + 6; // Apunta al carácter después de "/blog/"
+    // Extract the identifier after "/blog/"
+    const char *id = decoded_url + 6; // Points to the character after "/blog/"
 
-    // Opcional: Verificar que el ID no esté vacío
+    // Optional: Check that the ID is not empty
     if (strlen(id) == 0) {
-      // Responder con un error 404 si el ID está vacío
+      // Respond with a 404 error if the ID is empty
       const char *error_response = "HTTP/1.1 404 Not Found\r\n"
                                    "Content-Type: text/plain\r\n"
                                    "Content-Length: 13\r\n"
@@ -151,11 +129,11 @@ void handle_request(int client_socket, const char *root_directory) {
       return;
     }
 
-    // Llamar a la función para generar la página del blog específico
+    // Call the function to generate the specific blog page
     const char *response = buildBlogEntryWebSite(id);
 
     if (response == NULL) {
-      // Manejar el error si la respuesta es NULL
+      // Handle error if response is NULL
       const char *error_response = "HTTP/1.1 404 Not Found\r\n"
                                    "Content-Type: text/plain\r\n"
                                    "Content-Length: 13\r\n"
@@ -165,7 +143,7 @@ void handle_request(int client_socket, const char *root_directory) {
       write(client_socket, error_response, strlen(error_response));
     } else {
       write(client_socket, response, strlen(response));
-      free((void *)response); // Liberar la memoria si es necesario
+      free((void *)response); // Free up memory if necessary
     }
     close(client_socket);
     return;
