@@ -1,5 +1,3 @@
-// home_blog_items.h
-
 #ifndef HOME_BLOG_ITEMS_H
 #define HOME_BLOG_ITEMS_H
 

@@ -23,8 +23,8 @@ const char *home_blog() {
     }
 
     // Get blog list
-    int routeCount = 0;
-    HomeBlogItems *home_blog_items = getBlogItems(&routeCount);
+    int HomeBlogItemsCount = 0;
+    HomeBlogItems *home_blog_items = getBlogItems(&HomeBlogItemsCount);
     if (home_blog_items == NULL) {
         perror("Failed to load blog items");
         free((void *)home_blog_response);
@@ -37,7 +37,7 @@ const char *home_blog() {
     size_t itemsBufferSize = 0;
 
     // Generate the blog items
-    for (int i = 0; i < routeCount; i++) {
+    for (int i = 0; i < HomeBlogItemsCount; i++) {
         char itemBuffer[1024]; // Buffer to hold a single item
         int itemLength = snprintf(itemBuffer, sizeof(itemBuffer), home_blog_item_response, home_blog_items[i].url,
                                   home_blog_items[i].image_url, home_blog_items[i].url, home_blog_items[i].tittle,
