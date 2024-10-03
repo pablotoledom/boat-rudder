@@ -14,13 +14,24 @@ const char *blog_entry(const char *id) {
   const char *blog_entry_html =
       read_file_to_string("./html/blog/blog-entry_std2.html");
 
-  if (!blog_container_html || !blog_entry_html) {
+  // Get elements templates
+  const char *element_paragraph_html =
+      read_file_to_string("./html/elements/paragraph/paragraph_std2.html");
+
+  const char *element_tittle_2_html =
+      read_file_to_string("./html/elements/tittle/tittle_std2.html");
+
+  if (!blog_container_html || !blog_entry_html || !element_paragraph_html) {
     perror("Failed to load HTML templates");
     // Free allocated templates if any
     if (blog_container_html)
       free((void *)blog_container_html);
     if (blog_entry_html)
       free((void *)blog_entry_html);
+    if (element_paragraph_html)
+      free((void *)element_paragraph_html);
+    if (element_tittle_2_html)
+      free((void *)element_tittle_2_html);
     return NULL;
   }
 
@@ -31,6 +42,8 @@ const char *blog_entry(const char *id) {
     perror("Failed to load blog items");
     free((void *)blog_container_html);
     free((void *)blog_entry_html);
+    free((void *)element_paragraph_html);
+    free((void *)element_tittle_2_html);
     return NULL;
   }
 
@@ -41,11 +54,14 @@ const char *blog_entry(const char *id) {
   // Generate the blog items
   for (int i = 0; i < BlogEntryItemsCount; i++) {
     char itemBuffer[1024]; // Buffer to hold a single item
-    int itemLength =
-        snprintf(itemBuffer, sizeof(itemBuffer), blog_entry_html,
-                 home_blog_items[i].entry_id, home_blog_items[i].content_id,
-                 home_blog_items[i].type, home_blog_items[i].content,
-                 home_blog_items[i].extra_data);
+    int itemLength = 0;
+    if (strcmp(home_blog_items[i].type, "paragraph") == 0) {
+      itemLength = snprintf(itemBuffer, sizeof(itemBuffer),
+                            element_paragraph_html, home_blog_items[i].content);
+    } else if (strcmp(home_blog_items[i].type, "tittle") == 0) {
+      itemLength = snprintf(itemBuffer, sizeof(itemBuffer),
+                            element_tittle_2_html, home_blog_items[i].content);
+    }
 
     if (itemLength < 0) {
       perror("Error formatting item");
@@ -53,6 +69,8 @@ const char *blog_entry(const char *id) {
       free(home_blog_items);
       free((void *)blog_container_html);
       free((void *)blog_entry_html);
+      free((void *)element_paragraph_html);
+      free((void *)element_tittle_2_html);
       return NULL;
     }
 
@@ -65,6 +83,8 @@ const char *blog_entry(const char *id) {
       free(home_blog_items);
       free((void *)blog_container_html);
       free((void *)blog_entry_html);
+      free((void *)element_paragraph_html);
+      free((void *)element_tittle_2_html);
       return NULL;
     }
 
@@ -87,6 +107,8 @@ const char *blog_entry(const char *id) {
     free(home_blog_items);
     free((void *)blog_container_html);
     free((void *)blog_entry_html);
+    free((void *)element_paragraph_html);
+    free((void *)element_tittle_2_html);
     return NULL;
   }
 
