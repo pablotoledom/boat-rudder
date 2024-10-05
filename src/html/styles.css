@@ -1,11 +1,14 @@
 /* Body Style - Brutalist Raw Feel */
 body {
-  background-color: #000000;  /* White background */
-  color: #FFF;             /* Black text */
+  background-color: #000000;
+  /* White background */
+  color: #FFF;
+  /* Black text */
   font-family: Arial, sans-serif;
   margin: 0;
   padding: 0;
-  border: 2px solid #000000;  /* Bold black border around the entire page */
+  border: 2px solid #000000;
+  /* Bold black border around the entire page */
 }
 
 .main-container {
@@ -19,20 +22,25 @@ body {
 /* Top Menu - Raw, stark */
 .menu {
   /* width: 100%; */
-  background-color: #000000;  /* Bold yellow background */
-  text-align: left;           /* Left-aligned for raw feeling */
-  border-bottom: 2px solid #000000;  /* Thick bottom border */
+  background-color: #000000;
+  /* Bold yellow background */
+  text-align: left;
+  /* Left-aligned for raw feeling */
+  border-bottom: 2px solid #000000;
+  /* Thick bottom border */
 }
 
 .menu td {
   padding: 10px;
   font-size: 18px;
   font-weight: bold;
-  border-right: 2px solid #000000;  /* Separating columns with thick borders */
+  border-right: 2px solid #000000;
+  /* Separating columns with thick borders */
 }
 
 .menu a {
-  color: #FFF;              /* Black, unstyled text for links */
+  color: #FFF;
+  /* Black, unstyled text for links */
   text-decoration: none;
 }
 
@@ -51,18 +59,19 @@ td.menu__v-separation {
 .slider {
   width: 100%;
   text-align: center;
-  background-color: #ef09fb;
   background-image: url('/assets/slide/background/background.jpg');
   border: none;
 }
 
 .slider td {
-  border: none; /* Quita los bordes de las celdas */
-  padding: 0;    /* Quita el espacio interno en las celdas */
+  border: none;
+  /* Quita los bordes de las celdas */
+  padding: 0;
+  /* Quita el espacio interno en las celdas */
 }
 
 .slider__city {
- height: 174px;
+  height: 174px;
 }
 
 /* .slider__floor {
@@ -73,9 +82,11 @@ td.menu__v-separation {
 /* Page Title - Large, in-your-face */
 h1 {
   text-align: center;
-  font-size: 36px;             /* Big, bold text */
+  font-size: 36px;
+  /* Big, bold text */
   margin: 20px 0;
-  border: 2px solid #000000;   /* Thick border around the title */
+  border: 2px solid #000000;
+  /* Thick border around the title */
   padding: 10px;
 }
 
@@ -85,27 +96,97 @@ h1 {
   margin: 0 auto;
 }
 
-.catalog th, .catalog td {
-  padding: 20px;               /* Generous padding for bold feel */
-  border: 2px solid #000000;   /* Thick borders everywhere */
+.catalog th,
+.catalog td {
+  padding: 20px;
+  /* Generous padding for bold feel */
+  border: 2px solid #000000;
+  /* Thick borders everywhere */
   font-size: 18px;
 }
 
 .catalog th {
-  background-color: #FFA500;   /* Bright orange header */
+  background-color: #FFA500;
+  /* Bright orange header */
   color: #000000;
 }
 
 .catalog td {
-  background-color: #FFFFFF;   /* Simple white background */
+  background-color: #FFFFFF;
+  /* Simple white background */
   color: #000000;
 }
 
 /* Footer - Stark, minimalist */
 .footer {
   width: 100%;
-  background-color: #FFD700;   /* Same yellow as the top menu */
+  background-color: #FFD700;
+  /* Same yellow as the top menu */
   text-align: center;
   padding: 1em 1em;
   color: #000;
+}
+
+/*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+/* RESETS */
+
+a {
+  text-decoration: none;
+}
+
+a:link, a:visited, a:active {
+  color: white;
+}
+
+/*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+/* HTML NATIVE ELEMENTS */
+
+h2 {
+  margin: 0 0;
+}
+
+/*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+/* HOME BLOGS */
+
+.boat-rudder__home-blog {
+  width: 100%;
+}
+
+.boat-rudder__home-blog__container {
+  width: 80%;
+  max-width: 980px;
+}
+
+.boat-rudder__home-blog__item {
+  background-color: #313131;
+  padding: 5px;
+  width: 100%;
+}
+
+.boat-rudder__home-blog__item__container {
+  margin-left: 10px;
+  min-height: 170px;
+}
+
+.boat-rudder__home-blog__item__text {
+  vertical-align: top;
+}
+
+/*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+/* BLOG ENTRY */
+
+.boat-rudder__blog-entry__container {
+  width: 100%;
+}
+
+.boat-rudder__blog-entry {
+  width: 80%;
+}
+
+/*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+/* ELEMENTS */
+
+.boat-rudder__image-paragraph {
+  margin-top: 20px;
+  margin-right: 10px;
 }

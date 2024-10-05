@@ -38,7 +38,7 @@ const char *home_blog() {
 
     // Generate the blog items
     for (int i = 0; i < HomeBlogItemsCount; i++) {
-        char itemBuffer[1024]; // Buffer to hold a single item
+        char itemBuffer[2800]; // Buffer to hold a single item
         int itemLength = snprintf(itemBuffer, sizeof(itemBuffer), home_blog_item_response, home_blog_items[i].url,
                                   home_blog_items[i].image_url, home_blog_items[i].url, home_blog_items[i].tittle,
                                   home_blog_items[i].summary);

@@ -4,8 +4,8 @@
 #define MAX_ID_LENGTH 64
 #define MAX_URL_LENGTH 256
 #define MAX_IMAGE_URL_LENGTH 256
-#define MAX_TITLE_LENGTH 128
-#define MAX_SUMMARY_LENGTH 512
+#define MAX_TITLE_LENGTH 200
+#define MAX_SUMMARY_LENGTH 2000
 
 typedef struct {
     char id[MAX_ID_LENGTH];

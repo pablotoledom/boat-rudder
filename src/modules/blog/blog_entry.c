@@ -18,8 +18,14 @@ const char *blog_entry(const char *id) {
   const char *element_paragraph_html =
       read_file_to_string("./html/elements/paragraph/paragraph_std2.html");
 
-  const char *element_tittle_2_html =
+  const char *element_tittle_html =
       read_file_to_string("./html/elements/tittle/tittle_std2.html");
+
+  const char *element_image_html =
+      read_file_to_string("./html/elements/image/image_std2.html");
+  
+  const char *element_image_paragraph_html =
+      read_file_to_string("./html/elements/image-paragraph/image-paragraph_std2.html");
 
   if (!blog_container_html || !blog_entry_html || !element_paragraph_html) {
     perror("Failed to load HTML templates");
@@ -30,8 +36,12 @@ const char *blog_entry(const char *id) {
       free((void *)blog_entry_html);
     if (element_paragraph_html)
       free((void *)element_paragraph_html);
-    if (element_tittle_2_html)
-      free((void *)element_tittle_2_html);
+    if (element_tittle_html)
+      free((void *)element_tittle_html);
+    if (element_image_html)
+      free((void *)element_image_html);
+    if (element_image_paragraph_html)
+      free((void *)element_image_paragraph_html);
     return NULL;
   }
 
@@ -43,7 +53,9 @@ const char *blog_entry(const char *id) {
     free((void *)blog_container_html);
     free((void *)blog_entry_html);
     free((void *)element_paragraph_html);
-    free((void *)element_tittle_2_html);
+    free((void *)element_tittle_html);
+    free((void *)element_image_html);
+    free((void *)element_image_paragraph_html);
     return NULL;
   }
 
@@ -57,10 +69,16 @@ const char *blog_entry(const char *id) {
     int itemLength = 0;
     if (strcmp(home_blog_items[i].type, "paragraph") == 0) {
       itemLength = snprintf(itemBuffer, sizeof(itemBuffer),
-                            element_paragraph_html, home_blog_items[i].content);
+                            element_paragraph_html, home_blog_items[i].extra_data, home_blog_items[i].content);
     } else if (strcmp(home_blog_items[i].type, "tittle") == 0) {
       itemLength = snprintf(itemBuffer, sizeof(itemBuffer),
-                            element_tittle_2_html, home_blog_items[i].content);
+                            element_tittle_html, home_blog_items[i].extra_data, home_blog_items[i].content);
+    } else if (strcmp(home_blog_items[i].type, "image") == 0) {
+      itemLength = snprintf(itemBuffer, sizeof(itemBuffer),
+                            element_image_html, home_blog_items[i].content, home_blog_items[i].extra_data);
+    }else if (strcmp(home_blog_items[i].type, "image-paragraph") == 0) {
+      itemLength = snprintf(itemBuffer, sizeof(itemBuffer),
+                            element_image_paragraph_html, home_blog_items[i].content, home_blog_items[i].extra_data);
     }
 
     if (itemLength < 0) {
@@ -70,7 +88,9 @@ const char *blog_entry(const char *id) {
       free((void *)blog_container_html);
       free((void *)blog_entry_html);
       free((void *)element_paragraph_html);
-      free((void *)element_tittle_2_html);
+      free((void *)element_tittle_html);
+      free((void *)element_image_html);
+      free((void *)element_image_paragraph_html);
       return NULL;
     }
 
@@ -84,7 +104,9 @@ const char *blog_entry(const char *id) {
       free((void *)blog_container_html);
       free((void *)blog_entry_html);
       free((void *)element_paragraph_html);
-      free((void *)element_tittle_2_html);
+      free((void *)element_tittle_html);
+      free((void *)element_image_html);
+      free((void *)element_image_paragraph_html);
       return NULL;
     }
 
@@ -108,7 +130,9 @@ const char *blog_entry(const char *id) {
     free((void *)blog_container_html);
     free((void *)blog_entry_html);
     free((void *)element_paragraph_html);
-    free((void *)element_tittle_2_html);
+    free((void *)element_tittle_html);
+    free((void *)element_image_html);
+    free((void *)element_image_paragraph_html);
     return NULL;
   }
 
