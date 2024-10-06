@@ -23,11 +23,15 @@ const char *blog_entry(const char *id) {
 
   const char *element_image_html =
       read_file_to_string("./html/elements/image/image_std2.html");
-  
-  const char *element_image_paragraph_html =
-      read_file_to_string("./html/elements/image-paragraph/image-paragraph_std2.html");
 
-  if (!blog_container_html || !blog_entry_html || !element_paragraph_html) {
+  const char *element_image_paragraph_html = read_file_to_string(
+      "./html/elements/image-paragraph/image-paragraph_std2.html");
+  const char *element_date_time_html =
+      read_file_to_string("./html/elements/date-time/date-time_std2.html");
+
+  if (!blog_container_html || !blog_entry_html || !element_paragraph_html ||
+      !element_tittle_html || !element_image_html ||
+      !element_image_paragraph_html || !element_date_time_html) {
     perror("Failed to load HTML templates");
     // Free allocated templates if any
     if (blog_container_html)
@@ -42,6 +46,8 @@ const char *blog_entry(const char *id) {
       free((void *)element_image_html);
     if (element_image_paragraph_html)
       free((void *)element_image_paragraph_html);
+    if (element_date_time_html)
+      free((void *)element_date_time_html);
     return NULL;
   }
 
@@ -56,6 +62,7 @@ const char *blog_entry(const char *id) {
     free((void *)element_tittle_html);
     free((void *)element_image_html);
     free((void *)element_image_paragraph_html);
+    free((void *)element_date_time_html);
     return NULL;
   }
 
@@ -65,20 +72,28 @@ const char *blog_entry(const char *id) {
 
   // Generate the blog items
   for (int i = 0; i < BlogEntryItemsCount; i++) {
-    char itemBuffer[1024]; // Buffer to hold a single item
+    char itemBuffer[20480]; // Buffer to hold a single item
     int itemLength = 0;
     if (strcmp(home_blog_items[i].type, "paragraph") == 0) {
-      itemLength = snprintf(itemBuffer, sizeof(itemBuffer),
-                            element_paragraph_html, home_blog_items[i].extra_data, home_blog_items[i].content);
+      itemLength =
+          snprintf(itemBuffer, sizeof(itemBuffer), element_paragraph_html,
+                   home_blog_items[i].extra_data, home_blog_items[i].content);
     } else if (strcmp(home_blog_items[i].type, "tittle") == 0) {
-      itemLength = snprintf(itemBuffer, sizeof(itemBuffer),
-                            element_tittle_html, home_blog_items[i].extra_data, home_blog_items[i].content);
+      itemLength =
+          snprintf(itemBuffer, sizeof(itemBuffer), element_tittle_html,
+                   home_blog_items[i].extra_data, home_blog_items[i].content);
     } else if (strcmp(home_blog_items[i].type, "image") == 0) {
-      itemLength = snprintf(itemBuffer, sizeof(itemBuffer),
-                            element_image_html, home_blog_items[i].content, home_blog_items[i].extra_data);
-    }else if (strcmp(home_blog_items[i].type, "image-paragraph") == 0) {
-      itemLength = snprintf(itemBuffer, sizeof(itemBuffer),
-                            element_image_paragraph_html, home_blog_items[i].content, home_blog_items[i].extra_data);
+      itemLength =
+          snprintf(itemBuffer, sizeof(itemBuffer), element_image_html,
+                   home_blog_items[i].content, home_blog_items[i].extra_data);
+    } else if (strcmp(home_blog_items[i].type, "image-paragraph") == 0) {
+      itemLength =
+          snprintf(itemBuffer, sizeof(itemBuffer), element_image_paragraph_html,
+                   home_blog_items[i].content, home_blog_items[i].extra_data);
+    } else if (strcmp(home_blog_items[i].type, "date-time") == 0) {
+      itemLength =
+          snprintf(itemBuffer, sizeof(itemBuffer), element_date_time_html,
+                   home_blog_items[i].extra_data, home_blog_items[i].content);
     }
 
     if (itemLength < 0) {
@@ -91,6 +106,7 @@ const char *blog_entry(const char *id) {
       free((void *)element_tittle_html);
       free((void *)element_image_html);
       free((void *)element_image_paragraph_html);
+      free((void *)element_date_time_html);
       return NULL;
     }
 
@@ -107,6 +123,7 @@ const char *blog_entry(const char *id) {
       free((void *)element_tittle_html);
       free((void *)element_image_html);
       free((void *)element_image_paragraph_html);
+      free((void *)element_date_time_html);
       return NULL;
     }
 
@@ -133,6 +150,7 @@ const char *blog_entry(const char *id) {
     free((void *)element_tittle_html);
     free((void *)element_image_html);
     free((void *)element_image_paragraph_html);
+    free((void *)element_date_time_html);
     return NULL;
   }
 

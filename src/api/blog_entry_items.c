@@ -11,7 +11,7 @@
 BlogEntryItems *getBlogEntryItems(const char *EntryId, int *blogHomeCount) {
   // Call getData and get the total number of rows
   int totalRowCount = 0;
-  char ***responseList = getData("Blog", "A2", "E20", &totalRowCount);
+  char ***responseList = getData("Blog", "A2", "E200", &totalRowCount);
 
   if (responseList == NULL) {
     perror("Failed to get data");

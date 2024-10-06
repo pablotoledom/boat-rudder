@@ -181,12 +181,30 @@ h2 {
 
 .boat-rudder__blog-entry {
   width: 80%;
+  background-color: #313131;
+  padding: 20px 20px;
 }
 
 /*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 /* ELEMENTS */
 
 .boat-rudder__image-paragraph {
-  margin-top: 20px;
-  margin-right: 10px;
+  margin-right: 20px;
+  margin-bottom: 20px;
+}
+
+.boat-rudder__image__container {
+  text-align: center;
+  margin: 30px 0;
+}
+
+.boat-rudder__date-time {
+  text-align: right;
+  margin: 20px;
+}
+
+.boat-rudder__paragraph {
+  color: #cdcdcd;
+  font-size: 18px;
+  line-height: 24px;
 }
