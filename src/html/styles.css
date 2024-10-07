@@ -181,6 +181,7 @@ h2 {
 
 .boat-rudder__blog-entry {
   width: 80%;
+  max-width: 980px;
   background-color: #313131;
   padding: 20px 20px;
 }
@@ -198,6 +199,10 @@ h2 {
   margin: 30px 0;
 }
 
+.boat-rudder__image {
+  max-width: 80%;
+}
+
 .boat-rudder__date-time {
   text-align: right;
   margin: 20px;
@@ -207,4 +212,8 @@ h2 {
   color: #cdcdcd;
   font-size: 18px;
   line-height: 24px;
+}
+
+.boat-rudder__link {
+
 }
