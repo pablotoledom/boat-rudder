@@ -18,6 +18,53 @@
 
 #define BUFFER_SIZE 4096
 #define MAX_PATH_LENGTH (PATH_MAX + 256)
+#define MAX_PARAMS 10
+#define MAX_PARAM_LENGTH 100
+
+typedef struct {
+  char key[MAX_PARAM_LENGTH];
+  char value[MAX_PARAM_LENGTH];
+} QueryParam;
+
+void split_url(const char *url, char *route, QueryParam *params,
+               int *param_count) {
+  const char *query_start = strchr(url, '?');
+
+  if (query_start == NULL) {
+    // No query parameters
+    strcpy(route, url);
+    *param_count = 0;
+  } else {
+    // Copy the route
+    size_t route_length = query_start - url;
+    strncpy(route, url, route_length);
+    route[route_length] = '\0';
+
+    // Parse query parameters
+    const char *param = query_start + 1;
+    *param_count = 0;
+
+    while (param && *param && *param_count < MAX_PARAMS) {
+      const char *value = strchr(param, '=');
+      const char *next_param = strchr(param, '&');
+
+      if (value) {
+        size_t key_length = value - param;
+        strncpy(params[*param_count].key, param, key_length);
+        params[*param_count].key[key_length] = '\0';
+
+        value++; // Move past the '='
+        size_t value_length = next_param ? next_param - value : strlen(value);
+        strncpy(params[*param_count].value, value, value_length);
+        params[*param_count].value[value_length] = '\0';
+
+        (*param_count)++;
+      }
+
+      param = next_param ? next_param + 1 : NULL;
+    }
+  }
+}
 
 void handle_request(int client_socket, const char *root_directory) {
   char buffer[BUFFER_SIZE];
@@ -47,6 +94,18 @@ void handle_request(int client_socket, const char *root_directory) {
     return;
   }
 
+  char route[256];
+  QueryParam params[MAX_PARAMS];
+  int param_count;
+
+  split_url(url, route, params, &param_count);
+
+  printf("Route: %s\n", route);
+  printf("Query parameters:\n");
+  for (int i = 0; i < param_count; i++) {
+    printf("  %s: %s\n", params[i].key, params[i].value);
+  }
+
   // We only handle the GET method
   if (strcmp(method, "GET") != 0) {
     const char *method_not_allowed_response =
@@ -65,11 +124,10 @@ void handle_request(int client_socket, const char *root_directory) {
 
   // Decode the URL
   char decoded_url[256];
-  url_decode(decoded_url, url);
+  url_decode(decoded_url, route);
 
   // Check if the URL is exactly "/"
-  if (strcmp(decoded_url, "/") == 0 ||
-      strcmp(decoded_url, "") == 0) {
+  if (strcmp(decoded_url, "/") == 0 || strcmp(decoded_url, "") == 0) {
     // Reply with the blogs name page
     const char *response = buildHomeWebSite();
 

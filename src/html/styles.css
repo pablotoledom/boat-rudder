@@ -1,109 +1,3 @@
-/* Body Style - Brutalist Raw Feel */
-body {
-  background-color: #000000;
-  /* White background */
-  color: #FFFFFF;
-  /* Black text */
-  font-family: Arial, sans-serif;
-  margin: 0;
-  padding: 0;
-  border: 2px solid #000000;
-  /* Bold black border around the entire page */
-}
-
-.main-container {
-  width: 100%;
-}
-
-.menu__container {
-  width: 100%;
-}
-
-/* Top Menu - Raw, stark */
-.menu {
-  /* width: 100%; */
-  background-color: #000000;
-  /* Bold yellow background */
-  text-align: left;
-  /* Left-aligned for raw feeling */
-  border-bottom: 2px solid #000000;
-  /* Thick bottom border */
-}
-
-.menu td {
-  padding: 10px;
-  font-size: 18px;
-  font-weight: bold;
-  border-right: 2px solid #000000;
-  /* Separating columns with thick borders */
-}
-
-.menu a {
-  color: #FFF;
-  /* Black, unstyled text for links */
-  text-decoration: none;
-}
-
-td.menu__h-separation {
-  background-color: #FFF;
-  padding: 0 0;
-  height: 1px;
-  margin-top: 10px;
-}
-
-td.menu__v-separation {
-  background-color: #FFF;
-  padding: 0 0;
-}
-
-/* Page Title - Large, in-your-face */
-h1 {
-  text-align: center;
-  font-size: 36px;
-  /* Big, bold text */
-  margin: 20px 0;
-  border: 2px solid #000000;
-  /* Thick border around the title */
-  padding: 10px;
-}
-
-/* Product Table - Blocky, Brutalist */
-.catalog {
-  width: 100%;
-  margin: 0 auto;
-}
-
-.catalog th,
-.catalog td {
-  padding: 20px;
-  /* Generous padding for bold feel */
-  border: 2px solid #000000;
-  /* Thick borders everywhere */
-  font-size: 18px;
-}
-
-.catalog th {
-  background-color: #FFA500;
-  /* Bright orange header */
-  color: #000000;
-}
-
-.catalog td {
-  background-color: #FFFFFF;
-  /* Simple white background */
-  color: #000000;
-}
-
-/* Footer - Stark, minimalist */
-.footer {
-  width: 100%;
-  background-color: #FFD700;
-  /* Same yellow as the top menu */
-  text-align: center;
-  padding: 1em 1em;
-  color: #000;
-}
-
 /*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 /* RESETS */
 
@@ -111,8 +5,27 @@ a {
   text-decoration: none;
 }
 
-a:link, a:visited, a:active {
+a:link,
+a:visited,
+a:active {
   color: white;
+}
+
+body {
+  background-color: #000000;
+  color: #FFFFFF;
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  border: 2px solid #000000;
+}
+
+h1 {
+  text-align: center;
+  font-size: 36px;
+  margin: 20px 0;
+  border: 2px solid #000000;
+  padding: 10px;
 }
 
 /*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
@@ -120,6 +33,68 @@ a:link, a:visited, a:active {
 
 h2 {
   margin: 0 0;
+}
+
+/*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+/* MAIN CONTAINER */
+
+.boat-rudder__main-container {
+  width: 100%;
+}
+
+/*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+/* MENU */
+.boat-rudder__menu__container {
+  width: 100%;
+}
+
+/* Top Menu - Raw, stark */
+.boat-rudder__menu {
+  /* width: 100%; */
+  background-color: #000000;
+  text-align: left;
+  border-bottom: 2px solid #000000;
+}
+
+.boat-rudder__menu__space {
+  width: 100px;
+}
+
+.boat-rudder__menu td {
+  padding: 10px;
+  font-size: 18px;
+  font-weight: bold;
+  border-right: 2px solid #000000;
+}
+
+.boat-rudder__menu a {
+  color: #FFF;
+  text-decoration: none;
+}
+
+td.boat-rudder__menu__h-separation {
+  background-color: #575757;
+  ;
+  padding: 0 0;
+  height: 1px;
+  margin-top: 10px;
+}
+
+td.boat-rudder__menu__v-separation {
+  background-color: #FFF;
+  padding: 0 0;
+}
+
+.boat-rudder__menu__icon {
+  vertical-align: middle;
+}
+
+.boat-rudder__menu__icon-lang {
+  height: 32px;
+}
+
+.boat-rudder__menu__icon-mode {
+  height: 38px;
 }
 
 /*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
@@ -134,9 +109,7 @@ h2 {
 
 .boat-rudder__slider td {
   border: none;
-  /* Quita los bordes de las celdas */
   padding: 0;
-  /* Quita el espacio interno en las celdas */
 }
 
 .boat-rudder__slider__city {
@@ -147,6 +120,19 @@ h2 {
   height: 170px;
   background-image: url('/assets/slide/background/floor.jpg');
 } */
+
+
+/*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+/* FOOTER */
+
+.boat-rudder__footer {
+  width: 100%;
+  background-color: #FFD700;
+  /* Same yellow as the top menu */
+  text-align: center;
+  padding: 1em 1em;
+  color: #000;
+}
 
 /*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 /* HOME BLOGS */
@@ -242,6 +228,4 @@ h2 {
   line-height: 24px;
 }
 
-.boat-rudder__link {
-
-}
+.boat-rudder__link {}
