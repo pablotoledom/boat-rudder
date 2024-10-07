@@ -2,7 +2,7 @@
 body {
   background-color: #000000;
   /* White background */
-  color: #FFF;
+  color: #FFFFFF;
   /* Black text */
   font-family: Arial, sans-serif;
   margin: 0;
@@ -55,29 +55,6 @@ td.menu__v-separation {
   background-color: #FFF;
   padding: 0 0;
 }
-
-.slider {
-  width: 100%;
-  text-align: center;
-  background-image: url('/assets/slide/background/background.jpg');
-  border: none;
-}
-
-.slider td {
-  border: none;
-  /* Quita los bordes de las celdas */
-  padding: 0;
-  /* Quita el espacio interno en las celdas */
-}
-
-.slider__city {
-  height: 174px;
-}
-
-/* .slider__floor {
-  height: 170px;
-  background-image: url('/assets/slide/background/floor.jpg');
-} */
 
 /* Page Title - Large, in-your-face */
 h1 {
@@ -146,10 +123,44 @@ h2 {
 }
 
 /*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+/* SLIDER */
+
+.boat-rudder__slider {
+  width: 100%;
+  text-align: center;
+  background-image: url('/assets/slide/background/background.jpg');
+  border: none;
+}
+
+.boat-rudder__slider td {
+  border: none;
+  /* Quita los bordes de las celdas */
+  padding: 0;
+  /* Quita el espacio interno en las celdas */
+}
+
+.boat-rudder__slider__city {
+  height: 174px;
+}
+
+/* .boat-rudder__slider__floor {
+  height: 170px;
+  background-image: url('/assets/slide/background/floor.jpg');
+} */
+
+/*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 /* HOME BLOGS */
 
 .boat-rudder__home-blog {
   width: 100%;
+}
+
+.boat-rudder__home-blog__item__image {
+  width: 200px;
+  height: 168px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
 }
 
 .boat-rudder__home-blog__container {
@@ -161,6 +172,7 @@ h2 {
   background-color: #313131;
   padding: 5px;
   width: 100%;
+  color: #ffffff;
 }
 
 .boat-rudder__home-blog__item__container {
@@ -184,10 +196,26 @@ h2 {
   max-width: 980px;
   background-color: #313131;
   padding: 20px 20px;
+  color: #ffffff;
 }
 
 /*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 /* ELEMENTS */
+
+.boat-rudder__byline {
+  width: 100%;
+  margin: 20px 0;
+}
+
+.boat-rudder__byline__author {
+  width: 50%;
+  text-align: left;
+}
+
+.boat-rudder__byline__date-time {
+  width: 50%;
+  text-align: right;
+}
 
 .boat-rudder__image-paragraph {
   margin-right: 20px;
