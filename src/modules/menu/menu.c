@@ -1,6 +1,7 @@
 #define _XOPEN_SOURCE 700 // Define POSIX.1-2008 compliance level
 
 #include "../../api/route.h"
+#include "../../include/generate_url_theme.h"
 #include "../../include/read_file.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,11 +9,20 @@
 
 const char *menu() {
   // Get templates
-  const char *menu_response = read_file_to_string("./html/menu/menu_std2.html");
-  const char *menu_item_response =
-      read_file_to_string("./html/menu/menu-item_std2.html");
+  char *filename_menu_html = generate_url_theme("menu/menu_std2.html");
+  const char *menu_response = read_file_to_string(filename_menu_html);
+  free(filename_menu_html);
+
+  char *filename_menu_item_html =
+      generate_url_theme("menu/menu-item_std2.html");
+  const char *menu_item_response = read_file_to_string(filename_menu_item_html);
+  free(filename_menu_item_html);
+
+  char *filename_item_separator_html =
+      generate_url_theme("menu/menu-item-separator_std2.html");
   const char *menu_item_separator_response =
-      read_file_to_string("./html/menu/menu-item-separator_std2.html");
+      read_file_to_string(filename_item_separator_html);
+  free(filename_item_separator_html);
 
   if (!menu_response || !menu_item_response || !menu_item_separator_response) {
     perror("Failed to load HTML templates");
@@ -45,9 +55,10 @@ const char *menu() {
   // Generate the menu routes
   for (int i = 0; i < routeCount; i++) {
     char itemBuffer[512]; // Buffer to hold a single item
-    int itemLength = snprintf(
-        itemBuffer, sizeof(itemBuffer), menu_item_response, routes[i].link,
-        routes[i].name, i < (routeCount -1) ? menu_item_separator_response : "");
+    int itemLength =
+        snprintf(itemBuffer, sizeof(itemBuffer), menu_item_response,
+                 routes[i].link, routes[i].name,
+                 i < (routeCount - 1) ? menu_item_separator_response : "");
 
     if (itemLength < 0) {
       perror("Error formatting item");

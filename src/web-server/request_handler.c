@@ -1,6 +1,7 @@
 #define _XOPEN_SOURCE 700 // Define POSIX.1-2008 compliance level
 
 #include "../include/request_handler.h"
+#include "../include/config_loader.h"
 #include "../include/orchestrator.h"
 #include "../include/server_utils.h"
 #include <arpa/inet.h>
@@ -54,7 +55,7 @@ void split_url(const char *url, char *route, QueryParam *params,
         params[*param_count].key[key_length] = '\0';
 
         value++; // Move past the '='
-        size_t value_length = next_param ? next_param - value : strlen(value);
+        size_t value_length = next_param ? (size_t)(next_param - value) : strlen(value);
         strncpy(params[*param_count].value, value, value_length);
         params[*param_count].value[value_length] = '\0';
 
@@ -100,11 +101,39 @@ void handle_request(int client_socket, const char *root_directory) {
 
   split_url(url, route, params, &param_count);
 
-  printf("Route: %s\n", route);
-  printf("Query parameters:\n");
+  // printf("Route: %s\n", route);
+  // printf("Query parameters:\n");
+
+  strcpy(theme, "dark");
+  strcpy(lang, "Eng");
+  
   for (int i = 0; i < param_count; i++) {
     printf("  %s: %s\n", params[i].key, params[i].value);
+
+    if (strcmp(params[i].key, "theme") == 0) {
+      if (strcmp(params[i].value, "light") == 0) {
+        strcpy(theme, "light"); // Copia "light" en el array theme
+      } else if (strcmp(params[i].value, "dark") == 0) {
+        strcpy(theme, "dark"); // Copia "dark" en el array theme
+      }
+    }
+
+    if (strcmp(params[i].key, "lang") == 0) {
+      if (strcmp(params[i].value, "english") == 0) {
+        strcpy(lang, "Eng"); // Copia "english" en el array lang
+      } else if (strcmp(params[i].value, "spanish") == 0) {
+        strcpy(lang, "Esp"); // Copia "spanish" en el array lang
+      }
+    }
   }
+
+  // // Imprimir los valores finales
+  // if (strlen(theme) > 0) {
+  //   printf("Theme seleccionado: %s\n", theme);
+  // }
+  // if (strlen(lang) > 0) {
+  //   printf("Idioma seleccionado: %s\n", lang);
+  // }
 
   // We only handle the GET method
   if (strcmp(method, "GET") != 0) {

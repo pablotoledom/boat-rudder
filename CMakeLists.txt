@@ -19,6 +19,7 @@ set(SOURCES
     ./src/utils/print_table.c
     ./src/utils/config_loader.c
     ./src/utils/log.c
+    ./src/utils/generate_url_theme.c
     ./src/main.c
     ./src/orchestrator.c
     ./src/web-server/request_handler.c

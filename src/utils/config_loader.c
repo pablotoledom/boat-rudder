@@ -11,6 +11,8 @@ int verbose_level = 0;  // Default is disabled
 int server_port = 0;  // Default value for the port
 char spreadsheet_id[128] = {0};  // Initialize as an empty string
 char api_key[128] = {0};  // Initialize as an empty string
+char theme[16] = {0};  // Initialize as an empty string
+char lang[16] = {0};  // Initialize as an empty string
 
 // Implementation of load_config
 int load_config(const char *filename) {
@@ -51,6 +53,12 @@ int load_config(const char *filename) {
         } else if (strcmp(key, "api_key") == 0) {
             strncpy(api_key, value, sizeof(api_key) - 1);
             api_key[sizeof(api_key) - 1] = '\0';  // Ensure null terminator
+        }else if (strcmp(key, "theme") == 0) {
+            strncpy(theme, value, sizeof(theme) - 1);
+            theme[sizeof(theme) - 1] = '\0';  // Ensure null terminator
+        }else if (strcmp(key, "lang") == 0) {
+            strncpy(lang, value, sizeof(lang) - 1);
+            lang[sizeof(lang) - 1] = '\0';  // Ensure null terminator
         }
     }
 

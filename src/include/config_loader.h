@@ -10,5 +10,7 @@ extern int verbose_level; // 0: no log, 1: Errors, 2: Warnings, 3: Info and data
 extern int server_port;
 extern char spreadsheet_id[128];
 extern char api_key[128];
+extern char theme[16];
+extern char lang[16];
 
 #endif

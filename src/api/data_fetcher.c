@@ -1,6 +1,7 @@
 #define _XOPEN_SOURCE 700 // Define POSIX.1-2008 compliance level
 
 #include "data_fetcher.h"
+#include "../include/config_loader.h"
 #include "../include/log.h"
 #include "../utils/cJSON/cJSON.h"
 #include "google_sheets_api.h"
@@ -11,8 +12,10 @@
 // Function to parse JSON data and return a 2D array
 char ***getData(const char *sheetName, const char *startCell,
                 const char *endCell, int *rowCount) {
+  // printf("Idioma seleccionado: %s\n", lang);
   // Build query
-  int size = snprintf(NULL, 0, "%s!%s:%s", sheetName, startCell, endCell) + 1;
+  int size =
+      snprintf(NULL, 0, "%s%s!%s:%s", sheetName, lang, startCell, endCell) + 1;
 
   // Allocate memory for the resulting string
   char *range = (char *)malloc(size * sizeof(char));
@@ -22,7 +25,7 @@ char ***getData(const char *sheetName, const char *startCell,
   }
 
   // Format the string
-  snprintf(range, size, "%s!%s:%s", sheetName, startCell, endCell);
+  snprintf(range, size, "%s%s!%s:%s", sheetName, lang, startCell, endCell);
 
   // Fetch data from Google Sheets
   char *json_data = fetch_google_sheets_data(range);

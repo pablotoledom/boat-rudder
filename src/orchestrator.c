@@ -20,7 +20,7 @@ const char *buildHomeWebSite() {
 
   // Check if any component returned NULL
   if (!html_container || !html_menu || !html_slider || !html_home_blog) {
-    printf("Error: One or more HTML components are NULL.\n");
+    printf("Error buildHomeWebSite: One or more HTML components are NULL.\n");
     // Free allocated components if any
     if (html_container)
       free((void *)html_container);
@@ -109,7 +109,7 @@ const char *buildBlogWebSite() {
 
   // Check if any component returned NULL
   if (!html_container || !html_menu || !html_home_blog) {
-    printf("Error: One or more HTML components are NULL.\n");
+    printf("Error buildBlogWebSite: One or more HTML components are NULL.\n");
     // Free allocated components if any
     if (html_container)
       free((void *)html_container);
@@ -194,7 +194,7 @@ const char *buildBlogEntryWebSite(const char *id) {
 
   // Check if any component returned NULL
   if (!html_container || !html_menu || !html_blog_entry) {
-    printf("Error: One or more HTML components are NULL.\n");
+    printf("Error buildBlogEntryWebSite: One or more HTML components are NULL.\n");
     // Free allocated components if any
     if (html_container)
       free((void *)html_container);

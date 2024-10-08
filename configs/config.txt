@@ -2,3 +2,5 @@ verbose_level=3
 server_port=8080
 spreadsheet_id=1kOHas0XqFkiHdaE4RpWgB4dvNL731EnuGEIBkKpaRGw
 api_key=AIzaSyBMp9XaDQ8V4Rn6hU6TjI_mUSTqZg_RA0Y
+theme=dark
+lang=Eng
