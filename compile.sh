@@ -27,6 +27,7 @@ cp ./build/web-server ./bin/web-server
 # cp ./build/web-server-ssl ./bin/web-server-ssl
 # Copy folders
 cp -r ./ssl ./bin/ssl
+cp -r ./configs ./bin/configs
 cp -r ./src/html ./bin/html
 
 # Delete build directory if exist

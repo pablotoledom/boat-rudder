@@ -1,12 +1,11 @@
 # Minimum CMake version required
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 2.8.12)
 
 # Project name and language
-project(BoatRudder)
+project(BoatRudder C)
 
 # Set the C standard
-set(CMAKE_C_STANDARD 99)
-set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
 
 # Include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
@@ -15,29 +14,61 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 set(SOURCES
     ./src/utils/server_utils.c
     ./src/utils/read_file.c
+    ./src/utils/json_parser.c
+    ./src/utils/cJSON/cJSON.c
+    ./src/utils/print_table.c
+    ./src/utils/config_loader.c
+    ./src/utils/log.c
+    ./src/utils/generate_url_theme.c
     ./src/main.c
     ./src/orchestrator.c
     ./src/web-server/request_handler.c
     ./src/modules/container/container.c
     ./src/modules/menu/menu.c
     ./src/modules/slider/slider.c
-    ./src/modules/blog_home/blog_home.c
+    ./src/modules/blog/blog.c
+    ./src/modules/blog/blog_entry.c
+    ./src/modules/home_blog/home_blog.c
+    ./src/api/google_sheets_api.c
+    ./src/api/data_fetcher.c
+    ./src/api/route.c
+    ./src/api/home_blog_items.c
+    ./src/api/blog_entry_items.c
 )
 
 # Add executable target
 add_executable(web-server ${SOURCES})
 
-# Find Threads package for pthread
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
+# Find CURL package
+find_package(CURL REQUIRED)
 
-# Link the pthread library
-target_link_libraries(web-server PRIVATE Threads::Threads)
+if(CURL_FOUND)
+    message(STATUS "CURL found: ${CURL_VERSION_STRING}")
+    message(STATUS "CURL include dir: ${CURL_INCLUDE_DIRS}")
+    message(STATUS "CURL library: ${CURL_LIBRARIES}")
+else()
+    message(FATAL_ERROR "Could not find CURL")
+endif()
+
+# Include the CURL headers
+include_directories(${CURL_INCLUDE_DIRS})
+
+# Link the CURL library
+target_link_libraries(web-server ${CURL_LIBRARIES})
+
+# Find Threads package for pthread
+find_package(Threads REQUIRED)
+if(THREADS_HAVE_PTHREAD_ARG)
+    target_compile_options(web-server PRIVATE "-pthread")
+endif()
+if(CMAKE_THREAD_LIBS_INIT)
+    target_link_libraries(web-server "${CMAKE_THREAD_LIBS_INIT}")
+endif()
 
 # Add compiler definitions for POSIX compliance
-target_compile_definitions(web-server PRIVATE
-    _XOPEN_SOURCE=700
-)
+add_definitions(-D_XOPEN_SOURCE=700)
 
 # Add compiler options for warnings
-target_compile_options(web-server PRIVATE -Wall -Wextra)
+if(CMAKE_COMPILER_IS_GNUCC)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
+endif()
