@@ -4,6 +4,7 @@
 #include "../include/config_loader.h"
 #include "../include/orchestrator.h"
 #include "../include/server_utils.h"
+#include "../include/log.h"
 #include <arpa/inet.h>
 #include <dirent.h>
 #include <fcntl.h>
@@ -21,6 +22,11 @@
 #define MAX_PATH_LENGTH (PATH_MAX + 256)
 #define MAX_PARAMS 10
 #define MAX_PARAM_LENGTH 100
+
+// Route registry List
+#define ROUTE_HOME "/"
+#define ROUTE_BLOG "/blog"
+#define ROUTE_BLOG_ENTRY "/blog/"
 
 typedef struct {
   char key[MAX_PARAM_LENGTH];
@@ -101,8 +107,7 @@ void handle_request(int client_socket, const char *root_directory) {
 
   split_url(url, route, params, &param_count);
 
-  // printf("Route: %s\n", route);
-  // printf("Query parameters:\n");
+  LOG_INFO("Request URL: %s\n", route);
 
   strcpy(theme, "dark");
   strcpy(lang, "Eng");
@@ -127,13 +132,13 @@ void handle_request(int client_socket, const char *root_directory) {
     }
   }
 
-  // // Imprimir los valores finales
-  // if (strlen(theme) > 0) {
-  //   printf("Theme seleccionado: %s\n", theme);
-  // }
-  // if (strlen(lang) > 0) {
-  //   printf("Idioma seleccionado: %s\n", lang);
-  // }
+  // Imprimir los valores finales
+  if (strlen(theme) > 0) {
+    LOG_DEBUG("Theme seleccionado: %s\n", theme);
+  }
+  if (strlen(lang) > 0) {
+    LOG_DEBUG("Idioma seleccionado: %s\n", lang);
+  }
 
   // We only handle the GET method
   if (strcmp(method, "GET") != 0) {
@@ -156,9 +161,9 @@ void handle_request(int client_socket, const char *root_directory) {
   url_decode(decoded_url, route);
 
   // Check if the URL is exactly "/"
-  if (strcmp(decoded_url, "/") == 0 || strcmp(decoded_url, "") == 0) {
+  if (strcmp(decoded_url, ROUTE_HOME) == 0 || strcmp(decoded_url, "") == 0) {
     // Reply with the blogs name page
-    const char *response = buildHomeWebSite();
+    const char *response = buildHomeWebSite(ROUTE_HOME);
 
     if (response == NULL) {
       // Handle error if response is NULL
@@ -177,9 +182,9 @@ void handle_request(int client_socket, const char *root_directory) {
     return;
   }
   // Check if the URL is exactly "/blog"
-  else if (strcmp(decoded_url, "/blog") == 0 || strcmp(decoded_url, "") == 0) {
+  else if (strcmp(decoded_url, ROUTE_BLOG) == 0 || strcmp(decoded_url, "") == 0) {
     // Responder con la página principal del blog
-    const char *response = buildBlogWebSite();
+    const char *response = buildBlogWebSite(ROUTE_BLOG);
 
     if (response == NULL) {
       // Handle error if response is NULL
@@ -198,7 +203,7 @@ void handle_request(int client_socket, const char *root_directory) {
     return;
   }
   // Check if the URL start with "/blog/"
-  else if (strncmp(decoded_url, "/blog/", 6) == 0) {
+  else if (strncmp(decoded_url, ROUTE_BLOG_ENTRY, 6) == 0) {
     // Extract the identifier after "/blog/"
     const char *id = decoded_url + 6; // Points to the character after "/blog/"
 
@@ -217,7 +222,7 @@ void handle_request(int client_socket, const char *root_directory) {
     }
 
     // Call the function to generate the specific blog page
-    const char *response = buildBlogEntryWebSite(id);
+    const char *response = buildBlogEntryWebSite(id, ROUTE_BLOG);
 
     if (response == NULL) {
       // Handle error if response is NULL

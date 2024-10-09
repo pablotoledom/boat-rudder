@@ -11,10 +11,10 @@
 #include <stdlib.h> // For malloc and free
 #include <string.h> // For strlen
 
-const char *buildHomeWebSite() {
+const char *buildHomeWebSite(char *decoded_url) {
   // Get the HTML content from the modules
   const char *html_container = container();
-  const char *html_menu = menu();
+  const char *html_menu = menu(decoded_url);
   const char *html_slider = slider();
   const char *html_home_blog = home_blog();
 
@@ -101,10 +101,10 @@ const char *buildHomeWebSite() {
   return root_response;
 }
 
-const char *buildBlogWebSite() {
+const char *buildBlogWebSite(char *decoded_url) {
   // Get the HTML content from the modules
   const char *html_container = container();
-  const char *html_menu = menu();
+  const char *html_menu = menu(decoded_url);
   const char *html_home_blog = home_blog();
 
   // Check if any component returned NULL
@@ -186,10 +186,10 @@ const char *buildBlogWebSite() {
   return root_response;
 }
 
-const char *buildBlogEntryWebSite(const char *id) {
+const char *buildBlogEntryWebSite(const char *id, char *base_url) {
   // Get the HTML content from the modules
   const char *html_container = container();
-  const char *html_menu = menu();
+  const char *html_menu = menu(base_url);
   const char *html_blog_entry = blog_entry(id);
 
   // Check if any component returned NULL
