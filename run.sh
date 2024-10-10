@@ -3,7 +3,7 @@
 # Run server, with or not SSL
 
 cd ./bin
-./web-server ./html
+./boat-rudder ./html
 cd ..
 
-# ./bin/web-server-ssl ./bin/html
+# ./bin/boat-rudder-ssl ./bin/html

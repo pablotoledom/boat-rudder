@@ -37,7 +37,7 @@ set(SOURCES
 )
 
 # Add executable target
-add_executable(web-server ${SOURCES})
+add_executable(boat-rudder ${SOURCES})
 
 # Find CURL package
 find_package(CURL REQUIRED)
@@ -54,15 +54,15 @@ endif()
 include_directories(${CURL_INCLUDE_DIRS})
 
 # Link the CURL library
-target_link_libraries(web-server ${CURL_LIBRARIES})
+target_link_libraries(boat-rudder ${CURL_LIBRARIES})
 
 # Find Threads package for pthread
 find_package(Threads REQUIRED)
 if(THREADS_HAVE_PTHREAD_ARG)
-    target_compile_options(web-server PRIVATE "-pthread")
+    target_compile_options(boat-rudder PRIVATE "-pthread")
 endif()
 if(CMAKE_THREAD_LIBS_INIT)
-    target_link_libraries(web-server "${CMAKE_THREAD_LIBS_INIT}")
+    target_link_libraries(boat-rudder "${CMAKE_THREAD_LIBS_INIT}")
 endif()
 
 # Add compiler definitions for POSIX compliance

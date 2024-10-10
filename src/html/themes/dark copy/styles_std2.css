@@ -65,7 +65,7 @@ h2 {
 }
 
 .boat-rudder__menu td {
-  /* padding: 10px; */
+  padding: 10px;
   font-size: 18px;
   font-weight: bold;
   border-right: 2px solid #000000;
