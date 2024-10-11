@@ -1,6 +1,6 @@
 #ifndef BLOG_H
 #define BLOG_H
 
-const char *blog();
+const char *blog(int epoch);
 
 #endif // BLOG_H

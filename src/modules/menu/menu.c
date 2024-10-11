@@ -8,26 +8,27 @@
 #include <stdlib.h>
 #include <string.h>
 
-const char *menu(char *base_url) {
+const char *menu(char *base_url, int epoch) {
   LOG_DEBUG("Menu route: %s\n", base_url);
   // Get templates
-  char *filename_menu_html = generate_url_theme("menu/menu_std2.html");
+  char *filename_menu_html =
+      generate_url_theme("menu/menu_epoch%d.html", epoch);
   const char *menu_response = read_file_to_string(filename_menu_html);
   free(filename_menu_html);
 
   char *filename_menu_item_html =
-      generate_url_theme("menu/menu-item_std2.html");
+      generate_url_theme("menu/menu-item_epoch%d.html", epoch);
   const char *menu_item_response = read_file_to_string(filename_menu_item_html);
   free(filename_menu_item_html);
 
   char *filename_menu_item_selected_html =
-      generate_url_theme("menu/menu-item-selected_std2.html");
+      generate_url_theme("menu/menu-item-selected_epoch%d.html", epoch);
   const char *menu_item_selected_response =
       read_file_to_string(filename_menu_item_selected_html);
   free(filename_menu_item_selected_html);
 
   char *filename_item_separator_html =
-      generate_url_theme("menu/menu-item-separator_std2.html");
+      generate_url_theme("menu/menu-item-separator_epoch%d.html", epoch);
   const char *menu_item_separator_response =
       read_file_to_string(filename_item_separator_html);
   free(filename_item_separator_html);

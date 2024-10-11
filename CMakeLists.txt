@@ -20,6 +20,7 @@ set(SOURCES
     ./src/utils/config_loader.c
     ./src/utils/log.c
     ./src/utils/generate_url_theme.c
+    ./src/utils/detect_epoch.c
     ./src/main.c
     ./src/orchestrator.c
     ./src/web-server/request_handler.c

@@ -2,9 +2,10 @@
 
 #include "../include/request_handler.h"
 #include "../include/config_loader.h"
+#include "../include/detect_epoch.h"
+#include "../include/log.h"
 #include "../include/orchestrator.h"
 #include "../include/server_utils.h"
-#include "../include/log.h"
 #include <arpa/inet.h>
 #include <dirent.h>
 #include <fcntl.h>
@@ -61,7 +62,8 @@ void split_url(const char *url, char *route, QueryParam *params,
         params[*param_count].key[key_length] = '\0';
 
         value++; // Move past the '='
-        size_t value_length = next_param ? (size_t)(next_param - value) : strlen(value);
+        size_t value_length =
+            next_param ? (size_t)(next_param - value) : strlen(value);
         strncpy(params[*param_count].value, value, value_length);
         params[*param_count].value[value_length] = '\0';
 
@@ -85,6 +87,73 @@ void handle_request(int client_socket, const char *root_directory) {
   }
 
   buffer[bytes_read] = '\0';
+  // Lengths of the headers we want to search for
+  const char *user_agent_key = "User-Agent:";
+  const char *accept_language_key = "Accept-Language:";
+  size_t user_agent_key_len = strlen(user_agent_key);
+  size_t accept_language_key_len = strlen(accept_language_key);
+
+  // Pointers to store the headers we find
+  char *user_agent = NULL;
+  char *accept_language = NULL;
+
+  // Iterate through the buffer line by line
+  char *line = strtok(buffer, "\r\n");
+  while (line != NULL) {
+    // Check if the line contains "User-Agent"
+    if (strncmp(line, user_agent_key, user_agent_key_len) == 0) {
+      user_agent =
+          line + user_agent_key_len; // Skip the "User-Agent: " prefix
+    }
+    // Check if the line contains "Accept-Language"
+    else if (strncmp(line, accept_language_key, accept_language_key_len) == 0) {
+      accept_language =
+          line +
+          accept_language_key_len; // Skip the "Accept-Language: " prefix
+    }
+
+    // Exit the loop if we have found both headers
+    if (user_agent && accept_language) {
+      break;
+    }
+
+    // Next line
+    line = strtok(NULL, "\r\n");
+  }
+
+  // Print the found headers
+  if (user_agent) {
+    LOG_DEBUG("User-Agent: %s\n", user_agent);
+  } else {
+    LOG_DEBUG("User-Agent not found in the request\n");
+  }
+
+  if (accept_language) {
+    LOG_DEBUG("Client Language: %s\n", accept_language);
+  } else {
+    LOG_DEBUG("Accept-Language header not found\n");
+  }
+
+  // Detect the browser epoch based on the User-Agent
+  int epoch = detect_epoch(user_agent);
+
+  // Classify and redirect based on the detected epoch
+  switch (epoch) {
+  case EPOCH_EARLY:
+    LOG_DEBUG(
+        "Browser from the early era, redirect to the basic HTML template.\n");
+    break;
+  case EPOCH_MIDDLE:
+    LOG_DEBUG(
+        "Browser compatible with CSS1/CSS2, redirect to the CSS2 template.\n");
+    break;
+  case EPOCH_MODERN:
+    LOG_DEBUG("Modern browser compatible with CSS3/HTML5, redirect to the modern "
+           "template.\n");
+    break;
+  default:
+    LOG_DEBUG("Could not detect the browser's epoch.\n");
+  }
 
   // Parse the first line of the request
   if (sscanf(buffer, "%15s %255s %15s", method, url, protocol) != 3) {
@@ -107,11 +176,11 @@ void handle_request(int client_socket, const char *root_directory) {
 
   split_url(url, route, params, &param_count);
 
-  LOG_INFO("Request URL: %s\n", route);
+  LOG_DEBUG("Request URL: %s\n", route);
 
   strcpy(theme, "dark");
   strcpy(lang, "Eng");
-  
+
   for (int i = 0; i < param_count; i++) {
     printf("  %s: %s\n", params[i].key, params[i].value);
 
@@ -163,7 +232,7 @@ void handle_request(int client_socket, const char *root_directory) {
   // Check if the URL is exactly "/"
   if (strcmp(decoded_url, ROUTE_HOME) == 0 || strcmp(decoded_url, "") == 0) {
     // Reply with the blogs name page
-    const char *response = buildHomeWebSite(ROUTE_HOME);
+    const char *response = buildHomeWebSite(ROUTE_HOME, epoch);
 
     if (response == NULL) {
       // Handle error if response is NULL
@@ -182,9 +251,10 @@ void handle_request(int client_socket, const char *root_directory) {
     return;
   }
   // Check if the URL is exactly "/blog"
-  else if (strcmp(decoded_url, ROUTE_BLOG) == 0 || strcmp(decoded_url, "") == 0) {
+  else if (strcmp(decoded_url, ROUTE_BLOG) == 0 ||
+           strcmp(decoded_url, "") == 0) {
     // Responder con la página principal del blog
-    const char *response = buildBlogWebSite(ROUTE_BLOG);
+    const char *response = buildBlogWebSite(ROUTE_BLOG, epoch);
 
     if (response == NULL) {
       // Handle error if response is NULL
@@ -222,7 +292,7 @@ void handle_request(int client_socket, const char *root_directory) {
     }
 
     // Call the function to generate the specific blog page
-    const char *response = buildBlogEntryWebSite(id, ROUTE_BLOG);
+    const char *response = buildBlogEntryWebSite(id, ROUTE_BLOG, epoch);
 
     if (response == NULL) {
       // Handle error if response is NULL

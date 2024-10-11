@@ -7,58 +7,58 @@
 #include <stdlib.h>
 #include <string.h>
 
-const char *blog_entry(const char *id) {
+const char *blog_entry(const char *id, int epoch) {
   // Get templates
   char *filename_blog_container_html =
-      generate_url_theme("blog/blog-container_std2.html");
+      generate_url_theme("blog/blog-container_epoch%d.html", epoch);
   const char *blog_container_html =
       read_file_to_string(filename_blog_container_html);
   free(filename_blog_container_html);
 
   char *filename_blog_entry_html =
-      generate_url_theme("blog/blog-entry_std2.html");
+      generate_url_theme("blog/blog-entry_epoch%d.html", epoch);
   const char *blog_entry_html = read_file_to_string(filename_blog_entry_html);
   free(filename_blog_entry_html);
 
   // Get elements templates
   char *filename_element_paragraph_html =
-      generate_url_theme("elements/paragraph/paragraph_std2.html");
+      generate_url_theme("elements/paragraph/paragraph_epoch%d.html", epoch);
   const char *element_paragraph_html =
       read_file_to_string(filename_element_paragraph_html);
   free(filename_element_paragraph_html);
 
   char *filename_element_tittle_html =
-      generate_url_theme("elements/tittle/tittle_std2.html");
+      generate_url_theme("elements/tittle/tittle_epoch%d.html", epoch);
   const char *element_tittle_html =
       read_file_to_string(filename_element_tittle_html);
   free(filename_element_tittle_html);
 
   char *filename_element_image_html =
-      generate_url_theme("elements/image/image_std2.html");
+      generate_url_theme("elements/image/image_epoch%d.html", epoch);
   const char *element_image_html =
       read_file_to_string(filename_element_image_html);
   free(filename_element_image_html);
 
   char *filename_element_image_paragraph_html =
-      generate_url_theme("elements/image-paragraph/image-paragraph_std2.html");
+      generate_url_theme("elements/image-paragraph/image-paragraph_epoch%d.html", epoch);
   const char *element_image_paragraph_html =
       read_file_to_string(filename_element_image_paragraph_html);
   free(filename_element_image_paragraph_html);
 
   char *filename_element_date_time_html =
-      generate_url_theme("elements/date-time/date-time_std2.html");
+      generate_url_theme("elements/date-time/date-time_epoch%d.html", epoch);
   const char *element_date_time_html =
       read_file_to_string(filename_element_date_time_html);
   free(filename_element_date_time_html);
 
   char *filename_element_link_html =
-      generate_url_theme("elements/link/link_std2.html");
+      generate_url_theme("elements/link/link_epoch%d.html", epoch);
   const char *element_link_html =
       read_file_to_string(filename_element_link_html);
   free(filename_element_link_html);
 
   char *filename_element_byline_html =
-      generate_url_theme("elements/byline/byline_std2.html");
+      generate_url_theme("elements/byline/byline_epoch%d.html", epoch);
   const char *element_byline_html =
       read_file_to_string(filename_element_byline_html);
   free(filename_element_byline_html);

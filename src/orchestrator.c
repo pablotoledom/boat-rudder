@@ -11,12 +11,12 @@
 #include <stdlib.h> // For malloc and free
 #include <string.h> // For strlen
 
-const char *buildHomeWebSite(char *decoded_url) {
+const char *buildHomeWebSite(char *decoded_url, int epoch) {
   // Get the HTML content from the modules
-  const char *html_container = container();
-  const char *html_menu = menu(decoded_url);
-  const char *html_slider = slider();
-  const char *html_home_blog = home_blog();
+  const char *html_container = container(epoch);
+  const char *html_menu = menu(decoded_url,epoch);
+  const char *html_slider = slider(epoch);
+  const char *html_home_blog = home_blog(epoch);
 
   // Check if any component returned NULL
   if (!html_container || !html_menu || !html_slider || !html_home_blog) {
@@ -101,11 +101,11 @@ const char *buildHomeWebSite(char *decoded_url) {
   return root_response;
 }
 
-const char *buildBlogWebSite(char *decoded_url) {
+const char *buildBlogWebSite(char *decoded_url, int epoch) {
   // Get the HTML content from the modules
-  const char *html_container = container();
-  const char *html_menu = menu(decoded_url);
-  const char *html_home_blog = home_blog();
+  const char *html_container = container(epoch);
+  const char *html_menu = menu(decoded_url, epoch);
+  const char *html_home_blog = home_blog(epoch);
 
   // Check if any component returned NULL
   if (!html_container || !html_menu || !html_home_blog) {
@@ -186,11 +186,11 @@ const char *buildBlogWebSite(char *decoded_url) {
   return root_response;
 }
 
-const char *buildBlogEntryWebSite(const char *id, char *base_url) {
+const char *buildBlogEntryWebSite(const char *id, char *base_url, int epoch) {
   // Get the HTML content from the modules
-  const char *html_container = container();
-  const char *html_menu = menu(base_url);
-  const char *html_blog_entry = blog_entry(id);
+  const char *html_container = container(epoch);
+  const char *html_menu = menu(base_url, epoch);
+  const char *html_blog_entry = blog_entry(id, epoch);
 
   // Check if any component returned NULL
   if (!html_container || !html_menu || !html_blog_entry) {
