@@ -2,6 +2,7 @@
 
 #include "../../api/blog_entry_items.h"
 #include "../../include/generate_url_theme.h"
+#include "../../include/log.h"
 #include "../../include/read_file.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,8 +40,35 @@ const char *blog_entry(const char *id, int epoch) {
       read_file_to_string(filename_element_image_html);
   free(filename_element_image_html);
 
-  char *filename_element_image_paragraph_html =
-      generate_url_theme("elements/image-paragraph/image-paragraph_epoch%d.html", epoch);
+  char *filename_element_image_gallery_html = generate_url_theme(
+      "elements/image-gallery/image-gallery_epoch%d.html", epoch);
+  const char *element_image_gallery_html =
+      read_file_to_string(filename_element_image_gallery_html);
+  free(filename_element_image_gallery_html);
+
+  /////////////////////////
+  char *filename_element_gallery_container_html = generate_url_theme(
+      "elements/gallery/gallery-container_epoch%d.html", epoch);
+  const char *element_gallery_container_html =
+      read_file_to_string(filename_element_gallery_container_html);
+  free(filename_element_gallery_container_html);
+
+  char *filename_element_gallery_row_html =
+      generate_url_theme("elements/gallery/gallery-row_epoch%d.html", epoch);
+  const char *element_gallery_row_html =
+      read_file_to_string(filename_element_gallery_row_html);
+  free(filename_element_gallery_row_html);
+
+  char *filename_element_gallery_item_html =
+      generate_url_theme("elements/gallery/gallery-item_epoch%d.html", epoch);
+  const char *element_gallery_item_html =
+      read_file_to_string(filename_element_gallery_item_html);
+  free(filename_element_gallery_item_html);
+
+  /////////////////////////
+
+  char *filename_element_image_paragraph_html = generate_url_theme(
+      "elements/image-paragraph/image-paragraph_epoch%d.html", epoch);
   const char *element_image_paragraph_html =
       read_file_to_string(filename_element_image_paragraph_html);
   free(filename_element_image_paragraph_html);
@@ -65,8 +93,10 @@ const char *blog_entry(const char *id, int epoch) {
 
   if (!blog_container_html || !blog_entry_html || !element_paragraph_html ||
       !element_tittle_html || !element_image_html ||
-      !element_image_paragraph_html || !element_date_time_html ||
-      !element_link_html || !element_byline_html) {
+      !element_image_gallery_html || !element_image_paragraph_html ||
+      !element_date_time_html || !element_link_html || !element_byline_html ||
+      !element_gallery_container_html || !element_gallery_row_html ||
+      !element_gallery_item_html) {
     perror("Failed to load HTML templates");
     // Free allocated templates if any
     if (blog_container_html)
@@ -87,6 +117,14 @@ const char *blog_entry(const char *id, int epoch) {
       free((void *)element_link_html);
     if (element_byline_html)
       free((void *)element_byline_html);
+    if (element_image_gallery_html)
+      free((void *)element_image_gallery_html);
+    if (element_gallery_container_html)
+      free((void *)element_gallery_container_html);
+    if (element_gallery_row_html)
+      free((void *)element_gallery_row_html);
+    if (element_gallery_item_html)
+      free((void *)element_gallery_item_html);
     return NULL;
   }
 
@@ -104,6 +142,10 @@ const char *blog_entry(const char *id, int epoch) {
     free((void *)element_date_time_html);
     free((void *)element_link_html);
     free((void *)element_byline_html);
+    free((void *)element_image_gallery_html);
+    free((void *)element_gallery_container_html);
+    free((void *)element_gallery_row_html);
+    free((void *)element_gallery_item_html);
     return NULL;
   }
 
@@ -127,6 +169,11 @@ const char *blog_entry(const char *id, int epoch) {
       itemLength =
           snprintf(itemBuffer, sizeof(itemBuffer), element_image_html,
                    home_blog_items[i].content, home_blog_items[i].extra_data);
+    } else if (strcmp(home_blog_items[i].type, "image-gallery") == 0) {
+      itemLength =
+          snprintf(itemBuffer, sizeof(itemBuffer), element_image_gallery_html,
+                   home_blog_items[i].content, home_blog_items[i].content,
+                   home_blog_items[i].extra_data);
     } else if (strcmp(home_blog_items[i].type, "image-paragraph") == 0) {
       itemLength =
           snprintf(itemBuffer, sizeof(itemBuffer), element_image_paragraph_html,
@@ -143,6 +190,116 @@ const char *blog_entry(const char *id, int epoch) {
       itemLength =
           snprintf(itemBuffer, sizeof(itemBuffer), element_byline_html,
                    home_blog_items[i].content, home_blog_items[i].extra_data);
+    } else if (strcmp(home_blog_items[i].type, "gallery") == 0) {
+      char *image;
+      int columns;
+      int image_width;
+      int table_width;
+
+      int counter = 0;
+      int image_count = 0;
+      char *images;
+
+      // Allocate memory for images
+      images = malloc(strlen(home_blog_items[i].content) +
+                      1); // Allocate enough memory
+      if (images == NULL) {
+        LOG_ERROR("Failed to allocate memory");
+      }
+
+      // Copy the content of home_blog_items[i].content
+      strcpy(images, home_blog_items[i].content);
+
+      // Count the number of images (separated by ;)
+      image = strtok(images, ";");
+      while (image != NULL) {
+        image_count++;
+        image = strtok(NULL, ";");
+      }
+
+      // Determine the number of columns based on the number of images
+      if (image_count == 1) {
+        columns = 1;
+        image_width = 500;
+        table_width = 100;
+      } else if (image_count == 2) {
+        columns = 2;
+        image_width = 200;
+        table_width = 50;
+      } else if (image_count == 3) {
+        columns = 3;
+        image_width = 150;
+        table_width = 33;
+      } else if (image_count == 4) {
+        columns = 2;
+        image_width = 200;
+        table_width = 50;
+      } else {
+        columns = 3;
+        image_width = 150;
+        table_width = 33;
+      }
+
+      LOG_DEBUG("Number of columns: %i", columns);
+      LOG_DEBUG("Image width: %i px", image_width);
+      LOG_DEBUG("Table width: %i", table_width);
+
+      // Buffers to store the results
+      // Final buffer that will contain the complete table
+      char tableBuffer[4096] = "";
+      char rowBuffer[1024];              // Temporary buffer for rows
+      char cellBuffer[512];              // Temporary buffer for each cell
+      char rowsContentBuffer[2048] = ""; // Stores all the rows
+
+      // Reset the images to traverse them again
+      strcpy(images, home_blog_items[i].content);
+
+      // Use strtok to split the string by the ';' delimiter
+      image = strtok(images, ";");
+
+      // Traverse each image
+      while (image != NULL) {
+        // If counter is 0 or a multiple of columns, prepare a new row
+        if (counter % columns == 0) {
+          // Clear the row buffer for each new row
+          rowBuffer[0] = '\0';
+        }
+
+        // Prepare the cell content using the template for each image
+        snprintf(cellBuffer, sizeof(cellBuffer), element_gallery_item_html,
+                 table_width, image, image, image_width);
+
+        // Concatenate the cell content to the row
+        strcat(rowBuffer, cellBuffer);
+
+        counter++;
+
+        // If the counter is a multiple of columns, close the row
+        if (counter % columns == 0) {
+          // Add the row to the general content of rows
+          char completeRow[1024];
+          snprintf(completeRow, sizeof(completeRow), element_gallery_row_html,
+                   rowBuffer);
+          strcat(rowsContentBuffer, completeRow);
+        }
+
+        // Continue with the next token (image)
+        image = strtok(NULL, ";");
+      }
+
+      // If the last row is not complete, add it anyway
+      if (counter % columns != 0) {
+        char completeRow[1024];
+        snprintf(completeRow, sizeof(completeRow), element_gallery_row_html,
+                 rowBuffer);
+        strcat(rowsContentBuffer, completeRow);
+      }
+
+      // Print the final result
+      LOG_DEBUG("%s\n", tableBuffer);
+
+      itemLength = snprintf(itemBuffer, sizeof(itemBuffer),
+                            element_gallery_container_html, rowsContentBuffer);
     }
 
     if (itemLength < 0) {
@@ -158,6 +315,10 @@ const char *blog_entry(const char *id, int epoch) {
       free((void *)element_date_time_html);
       free((void *)element_link_html);
       free((void *)element_byline_html);
+      free((void *)element_image_gallery_html);
+      free((void *)element_gallery_container_html);
+      free((void *)element_gallery_row_html);
+      free((void *)element_gallery_item_html);
       return NULL;
     }
 
@@ -177,6 +338,10 @@ const char *blog_entry(const char *id, int epoch) {
       free((void *)element_date_time_html);
       free((void *)element_link_html);
       free((void *)element_byline_html);
+      free((void *)element_image_gallery_html);
+      free((void *)element_gallery_container_html);
+      free((void *)element_gallery_row_html);
+      free((void *)element_gallery_item_html);
       return NULL;
     }
 
@@ -206,6 +371,10 @@ const char *blog_entry(const char *id, int epoch) {
     free((void *)element_date_time_html);
     free((void *)element_link_html);
     free((void *)element_byline_html);
+    free((void *)element_image_gallery_html);
+    free((void *)element_gallery_container_html);
+    free((void *)element_gallery_row_html);
+    free((void *)element_gallery_item_html);
     return NULL;
   }
 

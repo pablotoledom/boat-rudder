@@ -15,7 +15,7 @@ function updateUrlParam(param, value) {
         }
     }
 
-    alert("url: " + url + ", param: " + param + ", value: " + value + ", paramList: " + paramList + ",newParam: " + newParam);
+    // alert("url: " + url + ", param: " + param + ", value: " + value + ", paramList: " + paramList + ",newParam: " + newParam);
 
     // If the parameter was not found, add it
     if (!updated) {
@@ -27,6 +27,6 @@ function updateUrlParam(param, value) {
     // var newUrl = window.location.pathname + '?' + newQueryString;
     var newUrl = url + '?' + newQueryString;
 
-    alert("window.location.pathname: " + window.location.pathname + "url: " + newUrl );
+    // alert("window.location.pathname: " + window.location.pathname + "url: " + newUrl );
     window.location.href = newUrl; // Redirect with the new URL
 }
