@@ -1,6 +1,8 @@
 #define _XOPEN_SOURCE 700 // Define POSIX.1-2008 compliance level
 
 #include "../../api/blog_entry_items.h"
+// #include "../../include/code_formatter/escape_html.h"
+#include "../../include/code_formatter/highlight_code.h"
 #include "../../include/generate_url_theme.h"
 #include "../../include/log.h"
 #include "../../include/read_file.h"
@@ -91,12 +93,18 @@ const char *blog_entry(const char *id, int epoch) {
       read_file_to_string(filename_element_byline_html);
   free(filename_element_byline_html);
 
+  char *filename_element_code_text_html =
+      generate_url_theme("elements/code-text/code-text_epoch%d.html", epoch);
+  const char *element_code_text_html =
+      read_file_to_string(filename_element_code_text_html);
+  free(filename_element_code_text_html);
+
   if (!blog_container_html || !blog_entry_html || !element_paragraph_html ||
       !element_tittle_html || !element_image_html ||
       !element_image_gallery_html || !element_image_paragraph_html ||
       !element_date_time_html || !element_link_html || !element_byline_html ||
       !element_gallery_container_html || !element_gallery_row_html ||
-      !element_gallery_item_html) {
+      !element_gallery_item_html || !element_code_text_html) {
     perror("Failed to load HTML templates");
     // Free allocated templates if any
     if (blog_container_html)
@@ -125,6 +133,8 @@ const char *blog_entry(const char *id, int epoch) {
       free((void *)element_gallery_row_html);
     if (element_gallery_item_html)
       free((void *)element_gallery_item_html);
+    if (element_code_text_html)
+      free((void *)element_code_text_html);
     return NULL;
   }
 
@@ -146,6 +156,7 @@ const char *blog_entry(const char *id, int epoch) {
     free((void *)element_gallery_container_html);
     free((void *)element_gallery_row_html);
     free((void *)element_gallery_item_html);
+    free((void *)element_code_text_html);
     return NULL;
   }
 
@@ -190,6 +201,21 @@ const char *blog_entry(const char *id, int epoch) {
       itemLength =
           snprintf(itemBuffer, sizeof(itemBuffer), element_byline_html,
                    home_blog_items[i].content, home_blog_items[i].extra_data);
+    } else if (strcmp(home_blog_items[i].type, "code-text") == 0) {
+      // Resaltar sintaxis
+      char *codigo_resaltado = highlight_code(home_blog_items[i].content);
+
+      // Formatear para HTML
+      char *html_final = malloc(strlen(codigo_resaltado) + 20);
+      sprintf(html_final, "%s", codigo_resaltado);
+
+      // Imprimir resultado
+      LOG_DEBUG("%s\n\n", home_blog_items[i].content);
+      LOG_DEBUG("%s\n\n", html_final);
+
+      itemLength =
+          snprintf(itemBuffer, sizeof(itemBuffer), element_code_text_html,
+                   html_final, home_blog_items[i].extra_data);
     } else if (strcmp(home_blog_items[i].type, "gallery") == 0) {
       char *image;
       int columns;
@@ -319,6 +345,7 @@ const char *blog_entry(const char *id, int epoch) {
       free((void *)element_gallery_container_html);
       free((void *)element_gallery_row_html);
       free((void *)element_gallery_item_html);
+      free((void *)element_code_text_html);
       return NULL;
     }
 
@@ -342,6 +369,7 @@ const char *blog_entry(const char *id, int epoch) {
       free((void *)element_gallery_container_html);
       free((void *)element_gallery_row_html);
       free((void *)element_gallery_item_html);
+      free((void *)element_code_text_html);
       return NULL;
     }
 
@@ -375,6 +403,7 @@ const char *blog_entry(const char *id, int epoch) {
     free((void *)element_gallery_container_html);
     free((void *)element_gallery_row_html);
     free((void *)element_gallery_item_html);
+    free((void *)element_code_text_html);
     return NULL;
   }
 
