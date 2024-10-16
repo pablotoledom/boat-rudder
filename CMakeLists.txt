@@ -21,17 +21,19 @@ set(SOURCES
     ./src/utils/log.c
     ./src/utils/generate_url_theme.c
     ./src/utils/detect_epoch.c
-    ./src/utils/code_formatter/escape_code.c
-    ./src/utils/code_formatter/highlight_html.c
-    ./src/utils/code_formatter/highlight_c.c
-    ./src/utils/code_formatter/highlight_code.c
-    ./src/utils/code_formatter/highlight_css.c
-    ./src/utils/code_formatter/highlight_html.c
-    ./src/utils/code_formatter/highlight_js.c
-    ./src/utils/code_formatter/highlight_python.c
-    ./src/utils/code_formatter/highlight_php.c
-    ./src/utils/code_formatter/highlight_basic.c
-    ./src/utils/code_formatter/highlight_prolog.c
+    ./src/utils/code_highlight/escape_code.c
+    ./src/utils/code_highlight/highlight_html.c
+    ./src/utils/code_highlight/highlight_c.c
+    ./src/utils/code_highlight/highlight_code.c
+    ./src/utils/code_highlight/highlight_css.c
+    ./src/utils/code_highlight/highlight_html.c
+    ./src/utils/code_highlight/highlight_js.c
+    ./src/utils/code_highlight/highlight_python.c
+    ./src/utils/code_highlight/highlight_php.c
+    ./src/utils/code_highlight/highlight_basic.c
+    ./src/utils/code_highlight/highlight_prolog.c
+    ./src/utils/code_highlight/highlight_bat.c
+    ./src/utils/code_highlight/highlight_bash.c
     ./src/main.c
     ./src/orchestrator.c
     ./src/web-server/request_handler.c

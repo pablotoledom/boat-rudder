@@ -3,4 +3,4 @@
 
 char* highlight_python(const char* code);
 
-#endif
+#endif // HIGHLIGHT_PYTHON_H

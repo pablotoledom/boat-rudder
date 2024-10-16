@@ -3,4 +3,4 @@
 
 char* highlight_c(const char* code);
 
-#endif
+#endif // HIGHLIGHT_C_H

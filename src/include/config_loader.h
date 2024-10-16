@@ -13,4 +13,4 @@ extern char api_key[128];
 extern char theme[16];
 extern char lang[16];
 
-#endif
+#endif // CONFIG_LOADER_H

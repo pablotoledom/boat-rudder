@@ -1,8 +1,8 @@
 #define _XOPEN_SOURCE 700 // Define POSIX.1-2008 compliance level
 
 #include "../../api/blog_entry_items.h"
-// #include "../../include/code_formatter/escape_html.h"
-#include "../../include/code_formatter/highlight_code.h"
+// #include "../../include/code_highlight/escape_html.h"
+#include "../../include/code_highlight/highlight_code.h"
 #include "../../include/generate_url_theme.h"
 #include "../../include/log.h"
 #include "../../include/read_file.h"
