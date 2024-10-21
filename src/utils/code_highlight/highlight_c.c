@@ -262,7 +262,7 @@ char *highlight_c(const char *code) {
 
         // Collect the identifier
         while (isalnum(*p) || *p == '_') {
-          if (token_index < sizeof(token) - 1) {
+          if (token_index < (int)(sizeof(token) - 1)) {
             token[token_index++] = *p;
           }
           p++;
@@ -289,7 +289,7 @@ char *highlight_c(const char *code) {
         // Collect the number
         while (isdigit(*p) || *p == '.' || *p == 'x' || *p == 'X' ||
                (*p >= 'a' && *p <= 'f') || (*p >= 'A' && *p <= 'F')) {
-          if (token_index < sizeof(token) - 1) {
+          if (token_index < (int)(sizeof(token) - 1)) {
             token[token_index++] = *p;
           }
           p++;

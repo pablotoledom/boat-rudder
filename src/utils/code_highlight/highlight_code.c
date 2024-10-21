@@ -40,7 +40,7 @@ Language detect_language(const char *code) {
   // Read the first non-blank line
   char line[256];
   int i = 0;
-  while (*p && *p != '\n' && *p != '\r' && i < sizeof(line) - 1) {
+  while (*p && *p != '\n' && *p != '\r' && i < (int)(sizeof(line) - 1)) {
     line[i++] = *p++;
   }
   line[i] = '\0'; // Null-terminate the line

@@ -234,7 +234,7 @@ char *highlight_php(const char *code) {
       } else if (isalpha(*p) || *p == '_') {
         // Handle identifiers (keywords or variables)
         int token_index = 0;
-        const char *start_p = p;
+
         while (isalnum(*p) || *p == '_') {
           if ((size_t)token_index < sizeof(token) - 1) {
             token[token_index++] = *p++;
@@ -260,7 +260,7 @@ char *highlight_php(const char *code) {
       } else if (isdigit(*p)) {
         // Handle numbers
         int token_index = 0;
-        const char *start_p = p;
+
         while (isdigit(*p) || *p == '.' || *p == 'x' || *p == 'X' ||
                (*p >= 'a' && *p <= 'f') || (*p >= 'A' && *p <= 'F')) {
           if ((size_t)token_index < sizeof(token) - 1) {

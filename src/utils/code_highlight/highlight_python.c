@@ -148,7 +148,7 @@ char *highlight_python(const char *code) {
       } else if (isalpha(*p) || *p == '_') {
         // Handle identifiers (e.g., keywords or variables)
         int token_index = 0;
-        const char *start_p = p;
+
         while (isalnum(*p) || *p == '_') {
           if ((size_t)token_index < sizeof(token) - 1) {
             token[token_index++] = *p;
@@ -173,7 +173,7 @@ char *highlight_python(const char *code) {
       } else if (isdigit(*p)) {
         // Handle numbers
         int token_index = 0;
-        const char *start_p = p;
+
         while (isdigit(*p) || *p == '.') {
           if ((size_t)token_index < sizeof(token) - 1) {
             token[token_index++] = *p;

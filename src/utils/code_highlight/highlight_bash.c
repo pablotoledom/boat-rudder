@@ -118,7 +118,7 @@ char *highlight_bash(const char *code) {
         // Read variable name
         int token_index = 0;
         while (isalnum(*p) || *p == '_') {
-          if (token_index < sizeof(token) - 1) {
+          if (token_index < (int)(sizeof(token) - 1)) {
             token[token_index++] = *p++;
           } else {
             p++;
@@ -136,7 +136,7 @@ char *highlight_bash(const char *code) {
         // Handle keywords or commands
         int token_index = 0;
         while (isalnum(*p) || *p == '_') {
-          if (token_index < sizeof(token) - 1) {
+          if (token_index < (int)(sizeof(token) - 1)) {
             token[token_index++] = *p++;
           } else {
             p++;
@@ -157,7 +157,7 @@ char *highlight_bash(const char *code) {
         // Handle numbers
         int token_index = 0;
         while (isdigit(*p) || *p == '.') {
-          if (token_index < sizeof(token) - 1) {
+          if (token_index < (int)(sizeof(token) - 1)) {
             token[token_index++] = *p++;
           } else {
             p++;

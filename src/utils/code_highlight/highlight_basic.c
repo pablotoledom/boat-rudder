@@ -131,9 +131,9 @@ char *highlight_basic(const char *code) {
       } else if (isalpha(*p)) {
         // Handle identifiers (keywords or variables)
         int token_index = 0;
-        const char *start_p = p;
+
         while (isalnum(*p) || *p == '_') {
-          if (token_index < sizeof(token) - 1) {
+          if (token_index < (int)(sizeof(token) - 1)) {
             token[token_index++] = *p++;
           } else {
             p++; // Skip overlong tokens
@@ -160,7 +160,7 @@ char *highlight_basic(const char *code) {
         // Handle numeric literals
         int token_index = 0;
         while (isdigit(*p) || *p == '.') {
-          if (token_index < sizeof(token) - 1) {
+          if (token_index < (int)(sizeof(token) - 1)) {
             token[token_index++] = *p++;
           } else {
             p++;

@@ -205,7 +205,7 @@ char *highlight_js(const char *code) {
         // Handle identifiers (e.g., keywords or variables)
         int token_index = 0;
         while (isalnum(*p) || *p == '_') {
-          if (token_index < sizeof(token) - 1) {
+          if (token_index < (int)(sizeof(token) - 1)) {
             token[token_index++] = *p;
           }
           p++;
@@ -229,7 +229,7 @@ char *highlight_js(const char *code) {
         // Handle numbers
         int token_index = 0;
         while (isdigit(*p) || *p == '.') {
-          if (token_index < sizeof(token) - 1) {
+          if (token_index < (int)(sizeof(token) - 1)) {
             token[token_index++] = *p;
           }
           p++;
