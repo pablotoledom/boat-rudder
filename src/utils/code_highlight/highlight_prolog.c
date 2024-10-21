@@ -60,7 +60,10 @@ char *highlight_prolog(const char *code) {
         in_string = 0; // Exit string mode
       } else if (*p == '\\' && (*(p + 1) == '\'' || *(p + 1) == '\\')) {
         // Handle escape sequences inside string
-        char temp[3] = {*p++, *p++, '\0'};
+        char temp[3];
+        temp[0] = *p++;
+        temp[1] = *p++;
+        temp[2] = '\0';
 
         char escaped[20];
         escape_html_chars(temp, escaped);

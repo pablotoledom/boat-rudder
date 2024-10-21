@@ -49,7 +49,10 @@ char *highlight_css(const char *code) {
       // Handle characters inside a comment block
       if (*p == '*' && *(p + 1) == '/') {
         // Close comment block when encountering */
-        char temp[3] = {*p++, *p++, '\0'};
+        char temp[3];
+        temp[0] = *p++;
+        temp[1] = *p++;
+        temp[2] = '\0';
 
         char escaped[20];
         escape_html_chars(temp, escaped); // Escape for HTML
@@ -82,8 +85,11 @@ char *highlight_css(const char *code) {
         // Start HTML span for the comment
         const char *open_span = "<span style=\"color:green;\">";
         append_to_result(&result, &res_size, &res_capacity, open_span);
-
-        char temp[3] = {*p++, *p++, '\0'};
+        
+        char temp[3];
+        temp[0] = *p++;
+        temp[1] = *p++;
+        temp[2] = '\0';
         char escaped[20];
         escape_html_chars(temp, escaped);
         append_to_result(&result, &res_size, &res_capacity, escaped);

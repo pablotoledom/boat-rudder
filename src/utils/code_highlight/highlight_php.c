@@ -116,7 +116,10 @@ char *highlight_php(const char *code) {
       // Handle multi-line comments
       if (*p == '*' && *(p + 1) == '/') {
         // End of multi-line comment
-        char temp[3] = {*p++, *p++, '\0'};
+        char temp[3];
+        temp[0] = *p++;
+        temp[1] = *p++;
+        temp[2] = '\0';
 
         char escaped[10];
         escape_html_chars(temp, escaped);
@@ -172,7 +175,10 @@ char *highlight_php(const char *code) {
         strcpy(res_p, open_span);
         res_p += strlen(open_span);
 
-        char temp[3] = {*p++, *p++, '\0'};
+        char temp[3];
+        temp[0] = *p++;
+        temp[1] = *p++;
+        temp[2] = '\0';
 
         char escaped[20];
         escape_html_chars(temp, escaped);

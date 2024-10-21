@@ -41,7 +41,10 @@ char *highlight_bash(const char *code) {
     if (in_string) {
       if (*p == '\\') {
         // Handle escape sequences
-        char temp[3] = {*p++, *p ? *p++ : '\0', '\0'};
+        char temp[3];
+        temp[0] = *p++;
+        temp[1] = *p ? *p++ : '\0'; // Check for null terminator
+        temp[2] = '\0';
         char escaped[20];
         escape_html_chars(temp, escaped);
         strcpy(res_p, escaped);
