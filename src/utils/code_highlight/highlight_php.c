@@ -156,7 +156,7 @@ char *highlight_php(const char *code) {
         strcpy(res_p, open_span);
         res_p += strlen(open_span);
 
-        char temp[2] = {*p++, '\0'};
+        char temp[3] = {*p++, '\0'};
         if (temp[0] == '/' && *p == '/') {
           temp[1] = *p++;
           temp[2] = '\0';
