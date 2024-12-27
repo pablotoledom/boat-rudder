@@ -7,15 +7,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-const char *blog() {
+const char *blog(int epoch) {
   // Get templates
   char *filename_home_blog_html =
-      generate_url_theme("blog/home-blog/home-blog_std2.html");
+      generate_url_theme("blog/home-blog/home-blog_epoch%d.html", epoch);
   const char *home_blog_response = read_file_to_string(filename_home_blog_html);
   free(filename_home_blog_html);
 
   char *filename_blog_item_html =
-      generate_url_theme("blog/home-blog/home-blog-item_std2.html");
+      generate_url_theme("blog/home-blog/home-blog-item_epoch%d.html", epoch);
   const char *home_blog_item_response =
       read_file_to_string(filename_blog_item_html);
   free(filename_blog_item_html);

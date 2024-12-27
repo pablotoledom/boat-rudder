@@ -20,6 +20,20 @@ set(SOURCES
     ./src/utils/config_loader.c
     ./src/utils/log.c
     ./src/utils/generate_url_theme.c
+    ./src/utils/detect_epoch.c
+    ./src/utils/code_highlight/escape_code.c
+    ./src/utils/code_highlight/highlight_html.c
+    ./src/utils/code_highlight/highlight_c.c
+    ./src/utils/code_highlight/highlight_code.c
+    ./src/utils/code_highlight/highlight_css.c
+    ./src/utils/code_highlight/highlight_html.c
+    ./src/utils/code_highlight/highlight_js.c
+    ./src/utils/code_highlight/highlight_python.c
+    ./src/utils/code_highlight/highlight_php.c
+    ./src/utils/code_highlight/highlight_basic.c
+    ./src/utils/code_highlight/highlight_prolog.c
+    ./src/utils/code_highlight/highlight_bat.c
+    ./src/utils/code_highlight/highlight_bash.c
     ./src/main.c
     ./src/orchestrator.c
     ./src/web-server/request_handler.c
@@ -37,7 +51,7 @@ set(SOURCES
 )
 
 # Add executable target
-add_executable(web-server ${SOURCES})
+add_executable(boat-rudder ${SOURCES})
 
 # Find CURL package
 find_package(CURL REQUIRED)
@@ -54,15 +68,15 @@ endif()
 include_directories(${CURL_INCLUDE_DIRS})
 
 # Link the CURL library
-target_link_libraries(web-server ${CURL_LIBRARIES})
+target_link_libraries(boat-rudder ${CURL_LIBRARIES})
 
 # Find Threads package for pthread
 find_package(Threads REQUIRED)
 if(THREADS_HAVE_PTHREAD_ARG)
-    target_compile_options(web-server PRIVATE "-pthread")
+    target_compile_options(boat-rudder PRIVATE "-pthread")
 endif()
 if(CMAKE_THREAD_LIBS_INIT)
-    target_link_libraries(web-server "${CMAKE_THREAD_LIBS_INIT}")
+    target_link_libraries(boat-rudder "${CMAKE_THREAD_LIBS_INIT}")
 endif()
 
 # Add compiler definitions for POSIX compliance

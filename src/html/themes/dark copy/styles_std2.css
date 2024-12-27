@@ -11,6 +11,10 @@ a:active {
   color: white;
 }
 
+a img {
+  border: none;
+}
+
 body {
   background-color: #000000;
   color: #FFFFFF;
@@ -67,14 +71,17 @@ h2 {
   border-right: 2px solid #000000;
 }
 
-.boat-rudder__menu a {
+.boat-rudder__menu__item {
   color: #FFF;
   text-decoration: none;
 }
 
+.boat-rudder__menu__item.boat-rudder__menu__item--selected {
+  color: #56e9fd;
+}
+
 td.boat-rudder__menu__h-separation {
   background-color: #575757;
-  ;
   padding: 0 0;
   height: 1px;
   margin-top: 10px;
@@ -87,6 +94,10 @@ td.boat-rudder__menu__v-separation {
 
 .boat-rudder__menu__icon {
   vertical-align: middle;
+}
+
+.boat-rudder__menu__icon__link {
+  text-decoration: none;
 }
 
 .boat-rudder__menu__icon-lang {

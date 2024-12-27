@@ -15,14 +15,18 @@ function updateUrlParam(param, value) {
         }
     }
 
+    // alert("url: " + url + ", param: " + param + ", value: " + value + ", paramList: " + paramList + ",newParam: " + newParam);
+
     // If the parameter was not found, add it
     if (!updated) {
-        paramList.push(newParam);
+        paramList[0] = newParam;
     }
 
     // Rebuild the query string
     var newQueryString = paramList.join('&');
-    var newUrl = window.location.pathname + '?' + newQueryString;
+    // var newUrl = window.location.pathname + '?' + newQueryString;
+    var newUrl = url + '?' + newQueryString;
 
+    // alert("window.location.pathname: " + window.location.pathname + "url: " + newUrl );
     window.location.href = newUrl; // Redirect with the new URL
 }

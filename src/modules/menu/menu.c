@@ -2,29 +2,39 @@
 
 #include "../../api/route.h"
 #include "../../include/generate_url_theme.h"
+#include "../../include/log.h"
 #include "../../include/read_file.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-const char *menu() {
+const char *menu(char *base_url, int epoch) {
+  LOG_DEBUG("Menu route: %s\n", base_url);
   // Get templates
-  char *filename_menu_html = generate_url_theme("menu/menu_std2.html");
+  char *filename_menu_html =
+      generate_url_theme("menu/menu_epoch%d.html", epoch);
   const char *menu_response = read_file_to_string(filename_menu_html);
   free(filename_menu_html);
 
   char *filename_menu_item_html =
-      generate_url_theme("menu/menu-item_std2.html");
+      generate_url_theme("menu/menu-item_epoch%d.html", epoch);
   const char *menu_item_response = read_file_to_string(filename_menu_item_html);
   free(filename_menu_item_html);
 
+  char *filename_menu_item_selected_html =
+      generate_url_theme("menu/menu-item-selected_epoch%d.html", epoch);
+  const char *menu_item_selected_response =
+      read_file_to_string(filename_menu_item_selected_html);
+  free(filename_menu_item_selected_html);
+
   char *filename_item_separator_html =
-      generate_url_theme("menu/menu-item-separator_std2.html");
+      generate_url_theme("menu/menu-item-separator_epoch%d.html", epoch);
   const char *menu_item_separator_response =
       read_file_to_string(filename_item_separator_html);
   free(filename_item_separator_html);
 
-  if (!menu_response || !menu_item_response || !menu_item_separator_response) {
+  if (!menu_response || !menu_item_response || !menu_item_separator_response ||
+      !menu_item_selected_response) {
     perror("Failed to load HTML templates");
     // Free allocated templates if any
     if (menu_response)
@@ -33,6 +43,8 @@ const char *menu() {
       free((void *)menu_item_response);
     if (menu_item_separator_response)
       free((void *)menu_item_separator_response);
+    if (menu_item_selected_response)
+      free((void *)menu_item_selected_response);
     return NULL;
   }
 
@@ -45,6 +57,7 @@ const char *menu() {
     free((void *)menu_response);
     free((void *)menu_item_response);
     free((void *)menu_item_separator_response);
+    free((void *)menu_item_selected_response);
     return NULL;
   }
 
@@ -55,10 +68,12 @@ const char *menu() {
   // Generate the menu routes
   for (int i = 0; i < routeCount; i++) {
     char itemBuffer[512]; // Buffer to hold a single item
-    int itemLength =
-        snprintf(itemBuffer, sizeof(itemBuffer), menu_item_response,
-                 routes[i].link, routes[i].name,
-                 i < (routeCount - 1) ? menu_item_separator_response : "");
+    int itemLength = snprintf(
+        itemBuffer, sizeof(itemBuffer),
+        strcmp(base_url, routes[i].link) == 0 ? menu_item_selected_response
+                                              : menu_item_response,
+        routes[i].link, routes[i].name,
+        i < (routeCount - 1) ? menu_item_separator_response : "");
 
     if (itemLength < 0) {
       perror("Error formatting item");
@@ -67,6 +82,7 @@ const char *menu() {
       free((void *)menu_response);
       free((void *)menu_item_response);
       free((void *)menu_item_separator_response);
+      free((void *)menu_item_selected_response);
       return NULL;
     }
 
@@ -80,6 +96,7 @@ const char *menu() {
       free((void *)menu_response);
       free((void *)menu_item_response);
       free((void *)menu_item_separator_response);
+      free((void *)menu_item_selected_response);
       return NULL;
     }
 
@@ -102,6 +119,7 @@ const char *menu() {
     free((void *)menu_response);
     free((void *)menu_item_response);
     free((void *)menu_item_separator_response);
+    free((void *)menu_item_selected_response);
     return NULL;
   }
 
@@ -118,6 +136,7 @@ const char *menu() {
   free((void *)menu_response);
   free((void *)menu_item_response);
   free((void *)menu_item_separator_response);
+  free((void *)menu_item_selected_response);
 
   return contentBuffer;
 }
