@@ -1,7 +1,6 @@
 #define _XOPEN_SOURCE 700 // Define POSIX.1-2008 compliance level
 
-#include "../../api/blog_entry_items.h"
-// #include "../../include/code_highlight/escape_html.h"
+#include "../../api/page_items.h"
 #include "../../include/code_highlight/highlight_code.h"
 #include "../../include/generate_url_theme.h"
 #include "../../include/log.h"
@@ -10,18 +9,18 @@
 #include <stdlib.h>
 #include <string.h>
 
-const char *blog_entry(const char *id, int epoch) {
+const char *page(const char *id, int epoch) {
   // Get templates
-  char *filename_blog_container_html =
-      generate_url_theme("blog/blog-container_epoch%d.html", epoch);
-  const char *blog_container_html =
-      read_file_to_string(filename_blog_container_html);
-  free(filename_blog_container_html);
+  char *filename_page_container_html =
+      generate_url_theme("page/page-container_epoch%d.html", epoch);
+  const char *page_container_html =
+      read_file_to_string(filename_page_container_html);
+  free(filename_page_container_html);
 
-  char *filename_blog_entry_html =
-      generate_url_theme("blog/blog-entry_epoch%d.html", epoch);
-  const char *blog_entry_html = read_file_to_string(filename_blog_entry_html);
-  free(filename_blog_entry_html);
+  char *filename_page_html =
+      generate_url_theme("page/page-entry_epoch%d.html", epoch);
+  const char *page_html = read_file_to_string(filename_page_html);
+  free(filename_page_html);
 
   // Get elements templates
   char *filename_element_paragraph_html =
@@ -99,7 +98,7 @@ const char *blog_entry(const char *id, int epoch) {
       read_file_to_string(filename_element_code_text_html);
   free(filename_element_code_text_html);
 
-  if (!blog_container_html || !blog_entry_html || !element_paragraph_html ||
+  if (!page_container_html || !page_html || !element_paragraph_html ||
       !element_tittle_html || !element_image_html ||
       !element_image_gallery_html || !element_image_paragraph_html ||
       !element_date_time_html || !element_link_html || !element_byline_html ||
@@ -107,10 +106,10 @@ const char *blog_entry(const char *id, int epoch) {
       !element_gallery_item_html || !element_code_text_html) {
     perror("Failed to load HTML templates");
     // Free allocated templates if any
-    if (blog_container_html)
-      free((void *)blog_container_html);
-    if (blog_entry_html)
-      free((void *)blog_entry_html);
+    if (page_container_html)
+      free((void *)page_container_html);
+    if (page_html)
+      free((void *)page_html);
     if (element_paragraph_html)
       free((void *)element_paragraph_html);
     if (element_tittle_html)
@@ -138,13 +137,13 @@ const char *blog_entry(const char *id, int epoch) {
     return NULL;
   }
 
-  // Get blog list
-  int BlogEntryItemsCount = 0;
-  BlogEntryItems *home_blog_items = getBlogEntryItems(id, &BlogEntryItemsCount);
-  if (home_blog_items == NULL) {
-    perror("Failed to load blog items");
-    free((void *)blog_container_html);
-    free((void *)blog_entry_html);
+  // Get page list
+  int PageItemsCount = 0;
+  PageItems *home_page_items = getPageItems(id, &PageItemsCount);
+  if (home_page_items == NULL) {
+    perror("Failed to load page items");
+    free((void *)page_container_html);
+    free((void *)page_html);
     free((void *)element_paragraph_html);
     free((void *)element_tittle_html);
     free((void *)element_image_html);
@@ -164,59 +163,59 @@ const char *blog_entry(const char *id, int epoch) {
   char *itemsBuffer = NULL;
   size_t itemsBufferSize = 0;
 
-  // Generate the blog items
-  for (int i = 0; i < BlogEntryItemsCount; i++) {
+  // Generate the page items
+  for (int i = 0; i < PageItemsCount; i++) {
     char itemBuffer[20480]; // Buffer to hold a single item
     int itemLength = 0;
-    if (strcmp(home_blog_items[i].type, "paragraph") == 0) {
+    if (strcmp(home_page_items[i].type, "paragraph") == 0) {
       itemLength =
           snprintf(itemBuffer, sizeof(itemBuffer), element_paragraph_html,
-                   home_blog_items[i].extra_data, home_blog_items[i].content);
-    } else if (strcmp(home_blog_items[i].type, "tittle") == 0) {
+                   home_page_items[i].extra_data, home_page_items[i].content);
+    } else if (strcmp(home_page_items[i].type, "tittle") == 0) {
       itemLength =
           snprintf(itemBuffer, sizeof(itemBuffer), element_tittle_html,
-                   home_blog_items[i].extra_data, home_blog_items[i].content);
-    } else if (strcmp(home_blog_items[i].type, "image") == 0) {
+                   home_page_items[i].extra_data, home_page_items[i].content);
+    } else if (strcmp(home_page_items[i].type, "image") == 0) {
       itemLength =
           snprintf(itemBuffer, sizeof(itemBuffer), element_image_html,
-                   home_blog_items[i].content, home_blog_items[i].extra_data);
-    } else if (strcmp(home_blog_items[i].type, "image-gallery") == 0) {
+                   home_page_items[i].content, home_page_items[i].extra_data);
+    } else if (strcmp(home_page_items[i].type, "image-gallery") == 0) {
       itemLength =
           snprintf(itemBuffer, sizeof(itemBuffer), element_image_gallery_html,
-                   home_blog_items[i].content, home_blog_items[i].content,
-                   home_blog_items[i].extra_data);
-    } else if (strcmp(home_blog_items[i].type, "image-paragraph") == 0) {
+                   home_page_items[i].content, home_page_items[i].content,
+                   home_page_items[i].extra_data);
+    } else if (strcmp(home_page_items[i].type, "image-paragraph") == 0) {
       itemLength =
           snprintf(itemBuffer, sizeof(itemBuffer), element_image_paragraph_html,
-                   home_blog_items[i].content, home_blog_items[i].extra_data);
-    } else if (strcmp(home_blog_items[i].type, "date-time") == 0) {
+                   home_page_items[i].content, home_page_items[i].extra_data);
+    } else if (strcmp(home_page_items[i].type, "date-time") == 0) {
       itemLength =
           snprintf(itemBuffer, sizeof(itemBuffer), element_date_time_html,
-                   home_blog_items[i].extra_data, home_blog_items[i].content);
-    } else if (strcmp(home_blog_items[i].type, "link") == 0) {
+                   home_page_items[i].extra_data, home_page_items[i].content);
+    } else if (strcmp(home_page_items[i].type, "link") == 0) {
       itemLength =
           snprintf(itemBuffer, sizeof(itemBuffer), element_link_html,
-                   home_blog_items[i].extra_data, home_blog_items[i].content);
-    } else if (strcmp(home_blog_items[i].type, "byline") == 0) {
+                   home_page_items[i].extra_data, home_page_items[i].content);
+    } else if (strcmp(home_page_items[i].type, "byline") == 0) {
       itemLength =
           snprintf(itemBuffer, sizeof(itemBuffer), element_byline_html,
-                   home_blog_items[i].content, home_blog_items[i].extra_data);
-    } else if (strcmp(home_blog_items[i].type, "code-text") == 0) {
+                   home_page_items[i].content, home_page_items[i].extra_data);
+    } else if (strcmp(home_page_items[i].type, "code-text") == 0) {
       // Resaltar sintaxis
-      char *codigo_resaltado = highlight_code(home_blog_items[i].content);
+      char *codigo_resaltado = highlight_code(home_page_items[i].content);
 
       // Formatear para HTML
       char *html_final = malloc(strlen(codigo_resaltado) + 20);
       sprintf(html_final, "%s", codigo_resaltado);
 
       // Imprimir resultado
-      LOG_DEBUG("%s\n\n", home_blog_items[i].content);
+      LOG_DEBUG("%s\n\n", home_page_items[i].content);
       LOG_DEBUG("%s\n\n", html_final);
 
       itemLength =
           snprintf(itemBuffer, sizeof(itemBuffer), element_code_text_html,
-                   html_final, home_blog_items[i].extra_data);
-    } else if (strcmp(home_blog_items[i].type, "gallery") == 0) {
+                   html_final, home_page_items[i].extra_data);
+    } else if (strcmp(home_page_items[i].type, "gallery") == 0) {
       char *image;
       int columns;
       int image_width;
@@ -227,14 +226,14 @@ const char *blog_entry(const char *id, int epoch) {
       char *images;
 
       // Allocate memory for images
-      images = malloc(strlen(home_blog_items[i].content) +
+      images = malloc(strlen(home_page_items[i].content) +
                       1); // Allocate enough memory
       if (images == NULL) {
         LOG_ERROR("Failed to allocate memory");
       }
 
-      // Copy the content of home_blog_items[i].content
-      strcpy(images, home_blog_items[i].content);
+      // Copy the content of home_page_items[i].content
+      strcpy(images, home_page_items[i].content);
 
       // Count the number of images (separated by ;)
       image = strtok(images, ";");
@@ -278,7 +277,7 @@ const char *blog_entry(const char *id, int epoch) {
       char rowsContentBuffer[2048] = ""; // Stores all the rows
 
       // Reset the images to traverse them again
-      strcpy(images, home_blog_items[i].content);
+      strcpy(images, home_page_items[i].content);
 
       // Use strtok to split the string by the ';' delimiter
       image = strtok(images, ";");
@@ -331,9 +330,9 @@ const char *blog_entry(const char *id, int epoch) {
     if (itemLength < 0) {
       perror("Error formatting item");
       free(itemsBuffer);
-      free(home_blog_items);
-      free((void *)blog_container_html);
-      free((void *)blog_entry_html);
+      free(home_page_items);
+      free((void *)page_container_html);
+      free((void *)page_html);
       free((void *)element_paragraph_html);
       free((void *)element_tittle_html);
       free((void *)element_image_html);
@@ -355,9 +354,9 @@ const char *blog_entry(const char *id, int epoch) {
     if (tempBuffer == NULL) {
       perror("Failed to allocate memory for itemsBuffer");
       free(itemsBuffer);
-      free(home_blog_items);
-      free((void *)blog_container_html);
-      free((void *)blog_entry_html);
+      free(home_page_items);
+      free((void *)page_container_html);
+      free((void *)page_html);
       free((void *)element_paragraph_html);
       free((void *)element_tittle_html);
       free((void *)element_image_html);
@@ -383,15 +382,15 @@ const char *blog_entry(const char *id, int epoch) {
 
   // Allocate buffer for the full HTML content
   size_t contentBufferSize =
-      snprintf(NULL, 0, blog_container_html, itemsBuffer) +
+      snprintf(NULL, 0, page_container_html, itemsBuffer) +
       1; // +1 for null terminator
   char *contentBuffer = malloc(contentBufferSize);
   if (contentBuffer == NULL) {
     perror("Failed to allocate memory for contentBuffer");
     free(itemsBuffer);
-    free(home_blog_items);
-    free((void *)blog_container_html);
-    free((void *)blog_entry_html);
+    free(home_page_items);
+    free((void *)page_container_html);
+    free((void *)page_html);
     free((void *)element_paragraph_html);
     free((void *)element_tittle_html);
     free((void *)element_image_html);
@@ -408,17 +407,17 @@ const char *blog_entry(const char *id, int epoch) {
   }
 
   // Format the final HTML content
-  snprintf(contentBuffer, contentBufferSize, blog_container_html, itemsBuffer);
+  snprintf(contentBuffer, contentBufferSize, page_container_html, itemsBuffer);
 
   // Free the itemsBuffer as it's no longer needed
   free(itemsBuffer);
 
-  // Free the blog items
-  free(home_blog_items);
+  // Free the page items
+  free(home_page_items);
 
   // Free the templates
-  free((void *)blog_container_html);
-  free((void *)blog_entry_html);
+  free((void *)page_container_html);
+  free((void *)page_html);
 
   return contentBuffer;
 }

@@ -41,13 +41,13 @@ set(SOURCES
     ./src/modules/menu/menu.c
     ./src/modules/slider/slider.c
     ./src/modules/blog/blog.c
-    ./src/modules/blog/blog_entry.c
+    ./src/modules/page/page.c
     ./src/modules/home_blog/home_blog.c
     ./src/api/google_sheets_api.c
     ./src/api/data_fetcher.c
     ./src/api/route.c
     ./src/api/home_blog_items.c
-    ./src/api/blog_entry_items.c
+    ./src/api/page_items.c
 )
 
 # Add executable target

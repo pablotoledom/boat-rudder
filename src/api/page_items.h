@@ -1,5 +1,5 @@
-#ifndef BLOG_ENTRY_ITEMS_H
-#define BLOG_ENTRY_ITEMS_H
+#ifndef PAGE_ITEMS_H
+#define PAGE_ITEMS_H
 
 #define MAX_ID_LENGTH 50
 #define MAX_CONTENT_ID_LENGTH 50
@@ -13,9 +13,9 @@ typedef struct {
   char type[MAX_TYPE_LENGTH];
   char content[MAX_CONTENT_LENGTH];
   char extra_data[MAX_EXTRA_DATA_LENGTH];
-} BlogEntryItems;
+} PageItems;
 
 // Function prototype const char *EntryId,
-BlogEntryItems *getBlogEntryItems(const char *EntryId, int *filteredCount);
+PageItems *getPageItems(const char *EntryId, int *filteredCount);
 
-#endif // BLOG_ENTRY_ITEMS_H
+#endif // PAGE_ITEMS_H

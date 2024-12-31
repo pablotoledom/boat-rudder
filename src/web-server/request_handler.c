@@ -28,6 +28,8 @@
 #define ROUTE_HOME "/"
 #define ROUTE_BLOG "/blog"
 #define ROUTE_BLOG_ENTRY "/blog/"
+#define ROUTE_PAGE "/page"
+#define ROUTE_PAGE_ENTRY "/page/"
 
 typedef struct {
   char key[MAX_PARAM_LENGTH];
@@ -292,7 +294,45 @@ void handle_request(int client_socket, const char *root_directory) {
     }
 
     // Call the function to generate the specific blog page
-    const char *response = buildBlogEntryWebSite(id, ROUTE_BLOG, epoch);
+    const char *response = buildPageEntryWebSite(id, ROUTE_BLOG, epoch);
+
+    if (response == NULL) {
+      // Handle error if response is NULL
+      const char *error_response = "HTTP/1.1 404 Not Found\r\n"
+                                   "Content-Type: text/plain\r\n"
+                                   "Content-Length: 13\r\n"
+                                   "Connection: close\r\n"
+                                   "\r\n"
+                                   "Not Found";
+      write(client_socket, error_response, strlen(error_response));
+    } else {
+      write(client_socket, response, strlen(response));
+      free((void *)response); // Free up memory if necessary
+    }
+    close(client_socket);
+    return;
+  }
+  // Check if the URL start with "/page/"
+  else if (strncmp(decoded_url, ROUTE_PAGE_ENTRY, 6) == 0) {
+    // Extract the identifier after "/blog/"
+    const char *id = decoded_url + 6; // Points to the character after "/blog/"
+
+    // Optional: Check that the ID is not empty
+    if (strlen(id) == 0) {
+      // Respond with a 404 error if the ID is empty
+      const char *error_response = "HTTP/1.1 404 Not Found\r\n"
+                                   "Content-Type: text/plain\r\n"
+                                   "Content-Length: 13\r\n"
+                                   "Connection: close\r\n"
+                                   "\r\n"
+                                   "Not Found";
+      write(client_socket, error_response, strlen(error_response));
+      close(client_socket);
+      return;
+    }
+
+    // Call the function to generate the specific blog page
+    const char *response = buildPageEntryWebSite(id, ROUTE_PAGE, epoch);
 
     if (response == NULL) {
       // Handle error if response is NULL
