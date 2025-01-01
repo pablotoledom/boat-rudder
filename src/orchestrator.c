@@ -126,7 +126,7 @@ const char *buildBlogWebSite(char *decoded_url, int epoch) {
 
   // Calculate the total size needed for the formatted string
   size_t total_length = snprintf(NULL, 0, html_container, html_menu, "",
-                                 html_home_blog) +
+                                 html_home_blog, "") +
                         1; // +1 for null terminator
 
   LOG_DEBUG("Total length to allocate: %zu\n", total_length);
@@ -146,7 +146,7 @@ const char *buildBlogWebSite(char *decoded_url, int epoch) {
 
   // Format the string by replacing %s in html_container with other
   // components
-  snprintf(buffer, total_length, html_container, html_menu, "", html_home_blog);
+  snprintf(buffer, total_length, html_container, html_menu, "", html_home_blog, "");
 
   // Free the component strings as they are no longer needed
   free((void *)html_container);
