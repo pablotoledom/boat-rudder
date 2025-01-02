@@ -68,6 +68,18 @@ const char *page(const char *id, int epoch) {
 
   /////////////////////////
 
+    char *filename_element_list_container_html = generate_url_theme(
+      "elements/list/list-container_epoch%d.html", epoch);
+  const char *element_list_container_html =
+      read_file_to_string(filename_element_list_container_html);
+  free(filename_element_list_container_html);
+
+  char *filename_element_list_item_html =
+      generate_url_theme("elements/list/list-item_epoch%d.html", epoch);
+  const char *element_list_item_html =
+      read_file_to_string(filename_element_list_item_html);
+  free(filename_element_list_item_html);
+
   char *filename_element_image_paragraph_html = generate_url_theme(
       "elements/image-paragraph/image-paragraph_epoch%d.html", epoch);
   const char *element_image_paragraph_html =
@@ -103,7 +115,8 @@ const char *page(const char *id, int epoch) {
       !element_image_gallery_html || !element_image_paragraph_html ||
       !element_date_time_html || !element_link_html || !element_byline_html ||
       !element_gallery_container_html || !element_gallery_row_html ||
-      !element_gallery_item_html || !element_code_text_html) {
+      !element_gallery_item_html || !element_code_text_html || 
+      !element_list_container_html || !element_list_item_html) {
     perror("Failed to load HTML templates");
     // Free allocated templates if any
     if (page_container_html)
@@ -134,6 +147,10 @@ const char *page(const char *id, int epoch) {
       free((void *)element_gallery_item_html);
     if (element_code_text_html)
       free((void *)element_code_text_html);
+    if (element_list_container_html)
+      free((void *)element_list_container_html);
+    if (element_list_item_html)
+      free((void *)element_list_item_html);
     return NULL;
   }
 
@@ -156,6 +173,8 @@ const char *page(const char *id, int epoch) {
     free((void *)element_gallery_row_html);
     free((void *)element_gallery_item_html);
     free((void *)element_code_text_html);
+    free((void *)element_list_container_html);
+    free((void *)element_list_item_html);
     return NULL;
   }
 
@@ -325,6 +344,48 @@ const char *page(const char *id, int epoch) {
 
       itemLength = snprintf(itemBuffer, sizeof(itemBuffer),
                             element_gallery_container_html, rowsContentBuffer);
+    } 
+    else if (strcmp(home_page_items[i].type, "list") == 0) {
+      char *item;
+      int counter = 0;
+      char *items;
+
+      // Allocate memory for items
+      items = malloc(strlen(home_page_items[i].content) + 1); // Allocate enough memory
+      if (items == NULL) {
+          LOG_ERROR("Failed to allocate memory for list items");
+          continue; // Skip this item and move to the next
+      }
+
+      // Copy the content of home_page_items[i].content
+      strcpy(items, home_page_items[i].content);
+
+      // Buffers to store the results
+      char listBuffer[4096] = "";              // Final buffer for the entire list
+      char listItemBuffer[512];                // Temporary buffer for each list item
+
+      // Use strtok to split the string by the ';' delimiter
+      item = strtok(items, ";");
+
+      // Traverse each item in the list
+      while (item != NULL) {
+          // Prepare the list item content using the template
+          snprintf(listItemBuffer, sizeof(listItemBuffer), element_list_item_html, item);
+
+          // Concatenate the list item to the final list buffer
+          strcat(listBuffer, listItemBuffer);
+
+          counter++;
+
+          // Get the next token (item)
+          item = strtok(NULL, ";");
+      }
+
+      // Free the allocated items buffer
+      free(items);
+
+      // Format the full list using the list container template
+      itemLength = snprintf(itemBuffer, sizeof(itemBuffer), element_list_container_html, listBuffer);
     }
 
     if (itemLength < 0) {
@@ -345,6 +406,8 @@ const char *page(const char *id, int epoch) {
       free((void *)element_gallery_row_html);
       free((void *)element_gallery_item_html);
       free((void *)element_code_text_html);
+      free((void *)element_list_container_html);
+      free((void *)element_list_item_html);
       return NULL;
     }
 
@@ -369,6 +432,8 @@ const char *page(const char *id, int epoch) {
       free((void *)element_gallery_row_html);
       free((void *)element_gallery_item_html);
       free((void *)element_code_text_html);
+      free((void *)element_list_container_html);
+      free((void *)element_list_item_html);
       return NULL;
     }
 
@@ -403,6 +468,8 @@ const char *page(const char *id, int epoch) {
     free((void *)element_gallery_row_html);
     free((void *)element_gallery_item_html);
     free((void *)element_code_text_html);
+    free((void *)element_list_container_html);
+    free((void *)element_list_item_html);
     return NULL;
   }
 
