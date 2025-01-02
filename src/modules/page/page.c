@@ -110,13 +110,26 @@ const char *page(const char *id, int epoch) {
       read_file_to_string(filename_element_code_text_html);
   free(filename_element_code_text_html);
 
+  char *filename_element_form_start_html =
+      generate_url_theme("elements/form/form-start_epoch%d.html", epoch);
+  const char *element_form_start_html =
+      read_file_to_string(filename_element_form_start_html);
+  free(filename_element_form_start_html);
+
+  char *filename_element_form_end_html =
+      generate_url_theme("elements/form/form-end_epoch%d.html", epoch);
+  const char *element_form_end_html =
+      read_file_to_string(filename_element_form_end_html);
+  free(filename_element_form_end_html);
+
   if (!page_container_html || !page_html || !element_paragraph_html ||
       !element_tittle_html || !element_image_html ||
       !element_image_gallery_html || !element_image_paragraph_html ||
       !element_date_time_html || !element_link_html || !element_byline_html ||
       !element_gallery_container_html || !element_gallery_row_html ||
       !element_gallery_item_html || !element_code_text_html || 
-      !element_list_container_html || !element_list_item_html) {
+      !element_list_container_html || !element_list_item_html || 
+      !element_form_start_html || !element_form_end_html) {
     perror("Failed to load HTML templates");
     // Free allocated templates if any
     if (page_container_html)
@@ -151,6 +164,10 @@ const char *page(const char *id, int epoch) {
       free((void *)element_list_container_html);
     if (element_list_item_html)
       free((void *)element_list_item_html);
+    if (element_form_start_html)
+      free((void *)element_form_start_html);
+    if (element_form_end_html)
+      free((void *)element_form_end_html);
     return NULL;
   }
 
@@ -175,6 +192,8 @@ const char *page(const char *id, int epoch) {
     free((void *)element_code_text_html);
     free((void *)element_list_container_html);
     free((void *)element_list_item_html);
+    free((void *)element_form_start_html);
+    free((void *)element_form_end_html);
     return NULL;
   }
 
@@ -191,9 +210,14 @@ const char *page(const char *id, int epoch) {
           snprintf(itemBuffer, sizeof(itemBuffer), element_paragraph_html,
                    home_page_items[i].extra_data, home_page_items[i].content);
     } else if (strcmp(home_page_items[i].type, "tittle") == 0) {
+      const char *extra_data = home_page_items[i].extra_data;
+      if (extra_data == NULL || strcmp(extra_data, "") == 0) {
+          extra_data = "1"; // Set 1 in case null or empty, get h1 result on template
+      }
+
       itemLength =
           snprintf(itemBuffer, sizeof(itemBuffer), element_tittle_html,
-                   home_page_items[i].extra_data, home_page_items[i].content);
+                  extra_data, home_page_items[i].content);
     } else if (strcmp(home_page_items[i].type, "image") == 0) {
       itemLength =
           snprintf(itemBuffer, sizeof(itemBuffer), element_image_html,
@@ -344,8 +368,7 @@ const char *page(const char *id, int epoch) {
 
       itemLength = snprintf(itemBuffer, sizeof(itemBuffer),
                             element_gallery_container_html, rowsContentBuffer);
-    } 
-    else if (strcmp(home_page_items[i].type, "list") == 0) {
+    } else if (strcmp(home_page_items[i].type, "list") == 0) {
       char *item;
       int counter = 0;
       char *items;
@@ -386,6 +409,14 @@ const char *page(const char *id, int epoch) {
 
       // Format the full list using the list container template
       itemLength = snprintf(itemBuffer, sizeof(itemBuffer), element_list_container_html, listBuffer);
+    } else if (strcmp(home_page_items[i].type, "form-start") == 0) {
+      itemLength =
+          snprintf(itemBuffer, sizeof(itemBuffer), element_form_start_html,
+                   home_page_items[i].content, home_page_items[i].extra_data);
+    } else if (strcmp(home_page_items[i].type, "form-end") == 0) {
+      itemLength =
+          snprintf(itemBuffer, sizeof(itemBuffer), element_form_end_html,
+                   home_page_items[i].content, home_page_items[i].extra_data);
     }
 
     if (itemLength < 0) {
@@ -408,6 +439,8 @@ const char *page(const char *id, int epoch) {
       free((void *)element_code_text_html);
       free((void *)element_list_container_html);
       free((void *)element_list_item_html);
+      free((void *)element_form_start_html);
+      free((void *)element_form_end_html);
       return NULL;
     }
 
@@ -434,6 +467,8 @@ const char *page(const char *id, int epoch) {
       free((void *)element_code_text_html);
       free((void *)element_list_container_html);
       free((void *)element_list_item_html);
+      free((void *)element_form_start_html);
+      free((void *)element_form_end_html);
       return NULL;
     }
 
@@ -470,6 +505,8 @@ const char *page(const char *id, int epoch) {
     free((void *)element_code_text_html);
     free((void *)element_list_container_html);
     free((void *)element_list_item_html);
+    free((void *)element_form_start_html);
+    free((void *)element_form_end_html);
     return NULL;
   }
 
