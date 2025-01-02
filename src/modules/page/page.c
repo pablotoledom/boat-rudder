@@ -122,14 +122,47 @@ const char *page(const char *id, int epoch) {
       read_file_to_string(filename_element_form_end_html);
   free(filename_element_form_end_html);
 
+  char *filename_element_button_primary_html =
+      generate_url_theme("elements/button/button-primary_epoch%d.html", epoch);
+  const char *element_button_primary_html =
+      read_file_to_string(filename_element_button_primary_html);
+  free(filename_element_button_primary_html);
+
+  char *filename_element_button_secondary_html =
+      generate_url_theme("elements/button/button-secondary_epoch%d.html", epoch);
+  const char *element_button_secondary_html =
+      read_file_to_string(filename_element_button_secondary_html);
+  free(filename_element_button_secondary_html);
+
+  char *filename_element_input_text_html =
+      generate_url_theme("elements/input/input-text_epoch%d.html", epoch);
+  const char *element_input_text_html =
+      read_file_to_string(filename_element_input_text_html);
+  free(filename_element_input_text_html);
+
+  char *filename_element_radio_button_html =
+      generate_url_theme("elements/radio-button/radio-button_epoch%d.html", epoch);
+  const char *element_radio_button_html =
+      read_file_to_string(filename_element_radio_button_html);
+  free(filename_element_radio_button_html);
+
+  char *filename_element_checkbox_html =
+      generate_url_theme("elements/checkbox/checkbox_epoch%d.html", epoch);
+  const char *element_checkbox_html =
+      read_file_to_string(filename_element_checkbox_html);
+  free(filename_element_checkbox_html);
+
   if (!page_container_html || !page_html || !element_paragraph_html ||
       !element_tittle_html || !element_image_html ||
       !element_image_gallery_html || !element_image_paragraph_html ||
       !element_date_time_html || !element_link_html || !element_byline_html ||
       !element_gallery_container_html || !element_gallery_row_html ||
-      !element_gallery_item_html || !element_code_text_html || 
-      !element_list_container_html || !element_list_item_html || 
-      !element_form_start_html || !element_form_end_html) {
+      !element_gallery_item_html || !element_code_text_html ||
+      !element_list_container_html || !element_list_item_html ||
+      !element_form_start_html || !element_form_end_html ||
+      !element_button_primary_html  || !element_button_secondary_html ||
+      !element_input_text_html  || !element_radio_button_html ||
+      !element_checkbox_html) {
     perror("Failed to load HTML templates");
     // Free allocated templates if any
     if (page_container_html)
@@ -168,6 +201,16 @@ const char *page(const char *id, int epoch) {
       free((void *)element_form_start_html);
     if (element_form_end_html)
       free((void *)element_form_end_html);
+    if (element_button_primary_html)
+      free((void *)element_button_primary_html);
+    if (element_button_secondary_html)
+      free((void *)element_button_secondary_html);
+    if (element_input_text_html)
+      free((void *)element_input_text_html);
+    if (element_radio_button_html)
+      free((void *)element_radio_button_html);
+    if (element_checkbox_html)
+      free((void *)element_checkbox_html);
     return NULL;
   }
 
@@ -194,6 +237,11 @@ const char *page(const char *id, int epoch) {
     free((void *)element_list_item_html);
     free((void *)element_form_start_html);
     free((void *)element_form_end_html);
+    free((void *)element_button_primary_html);
+    free((void *)element_button_secondary_html);
+    free((void *)element_input_text_html);
+    free((void *)element_radio_button_html);
+    free((void *)element_checkbox_html);
     return NULL;
   }
 
@@ -410,13 +458,54 @@ const char *page(const char *id, int epoch) {
       // Format the full list using the list container template
       itemLength = snprintf(itemBuffer, sizeof(itemBuffer), element_list_container_html, listBuffer);
     } else if (strcmp(home_page_items[i].type, "form-start") == 0) {
+      const char *extra_data = home_page_items[i].extra_data;
+      
+      if (extra_data == NULL || strcmp(extra_data, "") == 0) {
+          extra_data = "post";
+      }
+
       itemLength =
           snprintf(itemBuffer, sizeof(itemBuffer), element_form_start_html,
-                   home_page_items[i].content, home_page_items[i].extra_data);
+                  home_page_items[i].content, extra_data);
     } else if (strcmp(home_page_items[i].type, "form-end") == 0) {
       itemLength =
           snprintf(itemBuffer, sizeof(itemBuffer), element_form_end_html,
-                   home_page_items[i].content, home_page_items[i].extra_data);
+                  home_page_items[i].extra_data, home_page_items[i].content);
+    } else if (strcmp(home_page_items[i].type, "button-primary") == 0) {
+      const char *extra_data = home_page_items[i].extra_data;
+      if (extra_data == NULL || strcmp(extra_data, "") == 0) {
+          extra_data = "submit"; // Set submit in case null or empty
+      }
+
+      itemLength =
+          snprintf(itemBuffer, sizeof(itemBuffer), element_button_primary_html,
+                  extra_data, home_page_items[i].content);
+    } else if (strcmp(home_page_items[i].type, "button-secondary") == 0) {
+      const char *extra_data = home_page_items[i].extra_data;
+      if (extra_data == NULL || strcmp(extra_data, "") == 0) {
+          extra_data = "submit";
+      }
+
+      itemLength =
+          snprintf(itemBuffer, sizeof(itemBuffer), element_button_secondary_html,
+                  extra_data, home_page_items[i].content);
+    } else if (strcmp(home_page_items[i].type, "input-text") == 0) {
+      itemLength =
+          snprintf(itemBuffer, sizeof(itemBuffer), element_input_text_html,
+                  home_page_items[i].content_id, home_page_items[i].content, 
+                  home_page_items[i].content_id, home_page_items[i].extra_data);
+    } else if (strcmp(home_page_items[i].type, "radio-button") == 0) {
+      itemLength =
+          snprintf(itemBuffer, sizeof(itemBuffer), element_radio_button_html,
+                  home_page_items[i].content_id, home_page_items[i].extra_data, 
+                  home_page_items[i].content, home_page_items[i].content_id,
+                  home_page_items[i].content);
+    } else if (strcmp(home_page_items[i].type, "checkbox") == 0) {
+      itemLength =
+          snprintf(itemBuffer, sizeof(itemBuffer), element_checkbox_html,
+                  home_page_items[i].content_id, home_page_items[i].extra_data, 
+                  home_page_items[i].content, home_page_items[i].content_id,
+                  home_page_items[i].content);
     }
 
     if (itemLength < 0) {
@@ -441,6 +530,11 @@ const char *page(const char *id, int epoch) {
       free((void *)element_list_item_html);
       free((void *)element_form_start_html);
       free((void *)element_form_end_html);
+      free((void *)element_button_primary_html);
+      free((void *)element_button_secondary_html);
+      free((void *)element_input_text_html);
+      free((void *)element_radio_button_html);
+      free((void *)element_checkbox_html);
       return NULL;
     }
 
@@ -469,6 +563,11 @@ const char *page(const char *id, int epoch) {
       free((void *)element_list_item_html);
       free((void *)element_form_start_html);
       free((void *)element_form_end_html);
+      free((void *)element_button_primary_html);
+      free((void *)element_button_secondary_html);
+      free((void *)element_input_text_html);
+      free((void *)element_radio_button_html);
+      free((void *)element_checkbox_html);
       return NULL;
     }
 
@@ -507,6 +606,11 @@ const char *page(const char *id, int epoch) {
     free((void *)element_list_item_html);
     free((void *)element_form_start_html);
     free((void *)element_form_end_html);
+    free((void *)element_button_primary_html);
+    free((void *)element_button_secondary_html);
+    free((void *)element_input_text_html);
+    free((void *)element_radio_button_html);
+    free((void *)element_checkbox_html);
     return NULL;
   }
 

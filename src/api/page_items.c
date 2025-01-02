@@ -51,41 +51,52 @@ PageItems *getPageItems(const char *EntryId, int *pageCount) {
     memset(&page_list[i], 0, sizeof(PageItems));
   }
 
-  // Process the response list and copy matching entries
+  // Process the response list and copy the matching entries
   int index = 0;
   for (int i = 0; i < totalRowCount; i++) {
     if (responseList[i] != NULL && responseList[i][0] != NULL &&
-        strcmp(responseList[i][0], EntryId) == 0) {
+      strcmp(responseList[i][0], EntryId) == 0) {
 
-      if (responseList[i][0] != NULL)
-        strncpy(page_list[index].entry_id, responseList[i][0],
-                sizeof(page_list[index].entry_id) - 1);
-      else
-        page_list[index].entry_id[0] = '\0';
+      // Check and copy mandatory values
+      if (responseList[i][0] != NULL) {
+          strncpy(page_list[index].entry_id, responseList[i][0],
+                  sizeof(page_list[index].entry_id) - 1);
+      } else {
+          LOG_ERROR("Missing entry_id value in row %d", i + 1);
+          continue; // Skip this row
+      }
 
-      if (responseList[i][1] != NULL)
-        strncpy(page_list[index].content_id, responseList[i][1],
-                sizeof(page_list[index].content_id) - 1);
-      else
-        page_list[index].content_id[0] = '\0';
+      if (responseList[i][1] != NULL) {
+          strncpy(page_list[index].content_id, responseList[i][1],
+                  sizeof(page_list[index].content_id) - 1);
+      } else {
+          LOG_ERROR("Missing content_id value in row %d", i + 1);
+          continue; // Skip this row
+      }
 
-      if (responseList[i][2] != NULL)
-        strncpy(page_list[index].type, responseList[i][2],
-                sizeof(page_list[index].type) - 1);
-      else
-        page_list[index].type[0] = '\0';
+      if (responseList[i][2] != NULL) {
+          strncpy(page_list[index].type, responseList[i][2],
+                  sizeof(page_list[index].type) - 1);
+      } else {
+          LOG_ERROR("Missing type value in row %d", i + 1);
+          continue; // Skip this row
+      }
 
-      if (responseList[i][3] != NULL)
-        strncpy(page_list[index].content, responseList[i][3],
-                sizeof(page_list[index].content) - 1);
-      else
-        page_list[index].content[0] = '\0';
+      if (responseList[i][3] != NULL) {
+          strncpy(page_list[index].content, responseList[i][3],
+                  sizeof(page_list[index].content) - 1);
+      } else {
+          LOG_ERROR("Missing content value in row %d", i + 1);
+          continue; // Skip this row
+      }
 
-      if (responseList[i][4] != NULL)
-        strncpy(page_list[index].extra_data, responseList[i][4],
-                sizeof(page_list[index].extra_data) - 1);
-      else
-        page_list[index].extra_data[0] = '\0';
+      // Copy the optional `extra_data` value, if present
+      if (responseList[i][4] != NULL) {
+          strncpy(page_list[index].extra_data, responseList[i][4],
+                  sizeof(page_list[index].extra_data) - 1);
+      } else {
+          page_list[index].extra_data[0] = '\0'; // Initialize as an empty string
+      }
 
       index++;
     }
