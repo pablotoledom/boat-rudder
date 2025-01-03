@@ -4,7 +4,7 @@
 // Define the epochs
 #define EPOCH_EARLY 1
 #define EPOCH_MIDDLE 2
-#define EPOCH_MODERN 1
+#define EPOCH_MODERN 3
 
 // Function to detect the browser epoch based on the User-Agent
 int detect_epoch(const char *user_agent) {
