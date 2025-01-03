@@ -15,6 +15,20 @@ Boat Rudder is a modular Content Management System (CMS) written in C, designed 
 - **Language Support:** Multilingual capabilities (English and Spanish).
 - **Google Sheets Integration:** Fetches content directly from Google Sheets API.
 
+## Timeline
+
+1. ✅ **Define architecture and infrastructure**
+2. ✅ **Build web server**
+3. ✅ **API and definition of data sheet format in Google Sheets**
+4. ✅ **Navigation and routes API**
+5. ✅ **Page assembly modules**
+6. ✅ **Elements base in HTML files**
+7. 🛠️ **UI design and epoch programming**
+8. ⏳ **Create sample content**
+9. ⏳ **Build documentation**
+10. ⏳ **Release first version**
+11. ⏳ **Publish website**
+
 ## Architecture Overview
 
 The project is organized into modular components, each handling a specific functionality. Below is the directory structure:
@@ -49,19 +63,24 @@ boat-rudder/
 ## Key Components
 
 ### `main.c`
+
 The entry point of the CMS:
+
 - Loads configurations from `configs/config.txt`.
 - Initializes the HTTP server (`request_handler.c`).
 - Hands over control to the orchestrator module (`orchestrator.c`).
 
 ### Themes
+
 Themes are located in `html/themes/` and include:
+
 - **Dark Theme:** `html/themes/dark/`
 - **Light Theme:** `html/themes/light/`
 
 ## Setup Instructions
 
 ### Prerequisites
+
 - GCC or any C compiler.
 - Basic understanding of C programming.
 - Access to Google Sheets API (API key required).
@@ -70,21 +89,25 @@ Themes are located in `html/themes/` and include:
 ### System-specific Dependencies
 
 #### Linux (Arch/Manjaro)
+
 ```bash
 sudo pacman -Syu cmake gcc
 ```
 
 #### Linux (Ubuntu/Debian-based)
+
 ```bash
 sudo apt update && sudo apt install -y cmake gcc build-essential
 ```
 
 #### Linux (Red Hat/CentOS/Fedora)
+
 ```bash
 sudo dnf install cmake gcc make
 ```
 
 #### macOS
+
 1. Install Homebrew (if not already installed):
    ```bash
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -95,10 +118,12 @@ sudo dnf install cmake gcc make
    ```
 
 #### Windows
+
 1. Install [CMake](https://cmake.org/download/) and add it to your PATH.
 2. Install [MinGW](https://sourceforge.net/projects/mingw/) or another GCC-compatible compiler.
 
 ### Installation
+
 1. Clone the repository:
    ```bash
    git clone https://github.com/pablotoledom/boat-rudder.git
@@ -117,6 +142,7 @@ sudo dnf install cmake gcc make
    ```
 
 ### Running the CMS
+
 1. Update the configuration file located at `configs/config.txt`.
 2. Start the application:
    ```bash
@@ -124,12 +150,15 @@ sudo dnf install cmake gcc make
    ```
 
 ## Future Enhancements
+
 - Extend compatibility to additional languages.
 - Introduce more themes.
 - Add support for other data sources.
 
 ## Contributing
+
 Contributions are welcome! Please fork the repository, make your changes, and submit a pull request.
 
 ## License
+
 This project is licensed under the MIT License. See the `LICENSE` file for details.
