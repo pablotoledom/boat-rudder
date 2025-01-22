@@ -1,0 +1,121 @@
+/* RESET */
+
+body {
+  background-color: #000000;
+  color: #FFFFFF;
+  margin: 0;
+  width: 100%;
+}
+
+a {
+  text-decoration: none;
+}
+
+a:link,
+a:visited,
+a:active {
+  color: white;
+}
+
+h1 {
+  text-align: left;
+  font-size: 36px;
+  margin: 20px 0;
+  padding: 10px 0;
+}
+
+/*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+/* MAIN CONTAINER */
+
+.boat-rudder__main-container {
+  width: 100%;
+}
+
+/*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+/* PAGE ENTRY */
+
+.boat-rudder__page-entry__container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.boat-rudder__page-entry {
+  width: 80%;
+  max-width: 980px;
+  padding: 20px 20px;
+  color: #ffffff;
+}
+
+/*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+/* HOME BLOG */
+.boat-rudder__home-blog {
+  width: 100%;
+  display: flex;
+  background-image: url('/themes/dark/assets/home-blog/matrix-grid_epoch3.png');
+  background-repeat: no-repeat;
+  background-size: cover;
+  display: flex;
+  justify-content: center;
+}
+
+.boat-rudder__home-blog__container {
+  width: 80%;
+  max-width: 980px;
+  padding: 20px 20px;
+}
+
+.boat-rudder__home-blog__item__container h2 {
+  margin-top: 0;
+}
+
+.boat-rudder__home-blog__item {
+  background-color: #0000006b;
+  padding: 20px;
+  border: 1px solid #7b0a74;
+  margin: 20px 0;
+  display: flex;
+}
+
+.boat-rudder__home-blog__item__container {
+  margin-left: 20px;
+}
+
+.boat-rudder__home-blog__item__image {
+  width: 180px;
+  /* height: 150px; */
+  overflow: hidden;
+}
+
+.boat-rudder__home-blog__item__byline {
+  display: flex;
+  justify-content: space-between;
+}
+
+.boat-rudder__home-blog__item__byline-owner {
+  color: #8fc2ba;
+}
+
+.boat-rudder__home-blog__item__byline-date {
+  color: #fba8f6;
+}
+
+/*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
+/* FOOTER */
+.boat-rudder__footer {
+  width: 100%;
+  background-color: aqua;
+  height: 280;
+  background-image: url('/themes/dark/assets/footer/green-grid_epoch3.jpg');
+  background-repeat: no-repeat;
+  background-size: cover;
+  display: flex;
+  align-items: end;
+}
+
+.boat-rudder__footer-tittle {
+  background-color: rgba(0, 0, 0, 0.77);
+  padding: 10px;
+  width: 100%;
+  height: 20px;
+}
