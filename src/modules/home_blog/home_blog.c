@@ -51,7 +51,8 @@ const char *home_blog(int epoch) {
         snprintf(itemBuffer, sizeof(itemBuffer), home_blog_item_response,
                  home_blog_items[i].url, home_blog_items[i].image_url,
                  home_blog_items[i].url, home_blog_items[i].tittle,
-                 home_blog_items[i].summary);
+                 home_blog_items[i].summary, home_blog_items[i].author,
+                 home_blog_items[i].summary_date);
 
     if (itemLength < 0) {
       perror("Error formatting item");

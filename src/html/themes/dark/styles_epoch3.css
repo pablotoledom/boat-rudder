@@ -92,6 +92,10 @@ h1 {
   justify-content: space-between;
 }
 
+.boat-rudder__home-blog__item__separator {
+  border-color: #653061;
+}
+
 .boat-rudder__home-blog__item__byline-owner {
   color: #8fc2ba;
 }
