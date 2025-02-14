@@ -8,6 +8,70 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>  
+
+/**
+ * dynamic_strcat:
+ *  - *dest is the address of your dynamic buffer (where you concatenate).
+ *  - *cap is the current capacity (in bytes) of that buffer.
+ *  - src is the string you want to concatenate.
+ *
+ * This function expands (realloc) *dest if there is not enough space.
+ */
+static void dynamic_strcat(char **dest, size_t *cap, const char *src) {
+    size_t destLen = strlen(*dest);
+    size_t srcLen  = strlen(src);
+    size_t needed  = destLen + srcLen + 1; // +1 for the '\0'
+
+    // If it doesn't fit, we reallocate with some margin (e.g., doubling)
+    if (needed > *cap) {
+        size_t newCap = (needed < (*cap * 2)) ? (*cap * 2) : (needed * 2);
+        char *temp = realloc(*dest, newCap);
+        if (!temp) {
+            LOG_ERROR("Failed to reallocate memory (requested %zu bytes).", newCap);
+            // Error handling: you could abort, or return, etc.
+            return;
+        }
+        *dest = temp;
+        *cap  = newCap;
+
+        LOG_DEBUG("Buffer reallocated to %zu bytes", newCap);
+    }
+
+    // Finally, concatenate
+    strcat(*dest, src);
+}
+
+static char* dynamic_sprintf(const char *fmt, ...) {
+    va_list args;
+    va_list args_copy;
+    va_start(args, fmt);
+    va_copy(args_copy, args);
+
+    // 1. Calculate required space
+    int needed = vsnprintf(NULL, 0, fmt, args);
+    va_end(args);
+
+    if (needed < 0) {
+        LOG_ERROR("vsnprintf error while calculating size.");
+        va_end(args_copy);
+        return NULL;
+    }
+
+    // 2. Allocate the necessary memory (+1 for '\0')
+    char *buf = malloc(needed + 1);
+    if (!buf) {
+        LOG_ERROR("Failed to allocate %d bytes for dynamic_sprintf.", needed + 1);
+        va_end(args_copy);
+        return NULL;
+    }
+
+    // 3. Perform the actual print
+    vsnprintf(buf, needed + 1, fmt, args_copy);
+    va_end(args_copy);
+
+    return buf; // Returns the dynamically generated string
+}
 
 const char *page(const char *id, int epoch) {
   // Get templates
@@ -16,11 +80,6 @@ const char *page(const char *id, int epoch) {
   const char *page_container_html =
       read_file_to_string(filename_page_container_html);
   free(filename_page_container_html);
-
-  char *filename_page_html =
-      generate_url_theme("page/page-entry_epoch%d.html", epoch);
-  const char *page_html = read_file_to_string(filename_page_html);
-  free(filename_page_html);
 
   // Get elements templates
   char *filename_element_paragraph_html =
@@ -47,7 +106,6 @@ const char *page(const char *id, int epoch) {
       read_file_to_string(filename_element_image_gallery_html);
   free(filename_element_image_gallery_html);
 
-  /////////////////////////
   char *filename_element_gallery_container_html = generate_url_theme(
       "elements/gallery/gallery-container_epoch%d.html", epoch);
   const char *element_gallery_container_html =
@@ -66,9 +124,7 @@ const char *page(const char *id, int epoch) {
       read_file_to_string(filename_element_gallery_item_html);
   free(filename_element_gallery_item_html);
 
-  /////////////////////////
-
-    char *filename_element_list_container_html = generate_url_theme(
+  char *filename_element_list_container_html = generate_url_theme(
       "elements/list/list-container_epoch%d.html", epoch);
   const char *element_list_container_html =
       read_file_to_string(filename_element_list_container_html);
@@ -152,7 +208,19 @@ const char *page(const char *id, int epoch) {
       read_file_to_string(filename_element_checkbox_html);
   free(filename_element_checkbox_html);
 
-  if (!page_container_html || !page_html || !element_paragraph_html ||
+  char *filename_element_youtube_embed_html =
+      generate_url_theme("elements/youtube-embed/video_epoch%d.html", epoch);
+  const char *element_youtube_embed_html =
+      read_file_to_string(filename_element_youtube_embed_html);
+  free(filename_element_youtube_embed_html);
+
+  char *filename_element_separator_html =
+      generate_url_theme("elements/separator/separator_epoch%d.html", epoch);
+  const char *element_separator_html =
+      read_file_to_string(filename_element_separator_html);
+  free(filename_element_separator_html);
+
+  if (!page_container_html || !element_paragraph_html ||
       !element_tittle_html || !element_image_html ||
       !element_image_gallery_html || !element_image_paragraph_html ||
       !element_date_time_html || !element_link_html || !element_byline_html ||
@@ -162,13 +230,12 @@ const char *page(const char *id, int epoch) {
       !element_form_start_html || !element_form_end_html ||
       !element_button_primary_html  || !element_button_secondary_html ||
       !element_input_text_html  || !element_radio_button_html ||
-      !element_checkbox_html) {
+      !element_checkbox_html || !element_youtube_embed_html ||
+			!element_separator_html) {
     perror("Failed to load HTML templates");
     // Free allocated templates if any
     if (page_container_html)
       free((void *)page_container_html);
-    if (page_html)
-      free((void *)page_html);
     if (element_paragraph_html)
       free((void *)element_paragraph_html);
     if (element_tittle_html)
@@ -210,7 +277,11 @@ const char *page(const char *id, int epoch) {
     if (element_radio_button_html)
       free((void *)element_radio_button_html);
     if (element_checkbox_html)
-      free((void *)element_checkbox_html);
+      free((void *)element_checkbox_html); 
+    if (element_youtube_embed_html)
+      free((void *)element_youtube_embed_html);
+		if (element_separator_html)
+      free((void *)element_separator_html);
     return NULL;
   }
 
@@ -220,7 +291,6 @@ const char *page(const char *id, int epoch) {
   if (home_page_items == NULL) {
     perror("Failed to load page items");
     free((void *)page_container_html);
-    free((void *)page_html);
     free((void *)element_paragraph_html);
     free((void *)element_tittle_html);
     free((void *)element_image_html);
@@ -242,6 +312,8 @@ const char *page(const char *id, int epoch) {
     free((void *)element_input_text_html);
     free((void *)element_radio_button_html);
     free((void *)element_checkbox_html);
+    free((void *)element_youtube_embed_html);
+    free((void *)element_separator_html);
     return NULL;
   }
 
@@ -292,14 +364,14 @@ const char *page(const char *id, int epoch) {
           snprintf(itemBuffer, sizeof(itemBuffer), element_byline_html,
                    home_page_items[i].content, home_page_items[i].extra_data);
     } else if (strcmp(home_page_items[i].type, "code-text") == 0) {
-      // Resaltar sintaxis
+      // Syntax highlighting
       char *codigo_resaltado = highlight_code(home_page_items[i].content);
 
-      // Formatear para HTML
+      // Format for HTML
       char *html_final = malloc(strlen(codigo_resaltado) + 20);
       sprintf(html_final, "%s", codigo_resaltado);
 
-      // Imprimir resultado
+      // Print result
       LOG_DEBUG("%s\n\n", home_page_items[i].content);
       LOG_DEBUG("%s\n\n", html_final);
 
@@ -316,147 +388,190 @@ const char *page(const char *id, int epoch) {
       int image_count = 0;
       char *images;
 
-      // Allocate memory for images
-      images = malloc(strlen(home_page_items[i].content) +
-                      1); // Allocate enough memory
+      // 1) Copy the content for tokenizing
+      images = malloc(strlen(home_page_items[i].content) + 1);
       if (images == NULL) {
-        LOG_ERROR("Failed to allocate memory");
+          LOG_ERROR("Failed to allocate memory for images");
+          // Error handling: skip or abort
+          continue;
       }
-
-      // Copy the content of home_page_items[i].content
       strcpy(images, home_page_items[i].content);
 
-      // Count the number of images (separated by ;)
+      // 2) Count how many images are there
       image = strtok(images, ";");
       while (image != NULL) {
-        image_count++;
-        image = strtok(NULL, ";");
+          image_count++;
+          image = strtok(NULL, ";");
       }
 
-      // Determine the number of columns based on the number of images
+      // Determine columns
       if (image_count == 1) {
-        columns = 1;
-        image_width = 500;
-        table_width = 100;
+          columns = 1; image_width = 500; table_width = 100;
       } else if (image_count == 2) {
-        columns = 2;
-        image_width = 200;
-        table_width = 50;
+          columns = 2; image_width = 200; table_width = 50;
       } else if (image_count == 3) {
-        columns = 3;
-        image_width = 150;
-        table_width = 33;
+          columns = 3; image_width = 150; table_width = 33;
       } else if (image_count == 4) {
-        columns = 2;
-        image_width = 200;
-        table_width = 50;
+          columns = 2; image_width = 200; table_width = 50;
       } else {
-        columns = 3;
-        image_width = 150;
-        table_width = 33;
+          columns = 3; image_width = 150; table_width = 33;
       }
 
-      LOG_DEBUG("Number of columns: %i", columns);
-      LOG_DEBUG("Image width: %i px", image_width);
-      LOG_DEBUG("Table width: %i", table_width);
+      LOG_DEBUG("Number of columns: %d", columns);
+      LOG_DEBUG("Image width: %d px", image_width);
+      LOG_DEBUG("Table width: %d", table_width);
 
-      // Buffers to store the results
-      // Final buffer that will contain the complete table
-      char tableBuffer[4096] = "";
-      char rowBuffer[1024];              // Temporary buffer for rows
-      char cellBuffer[512];              // Temporary buffer for each cell
-      char rowsContentBuffer[2048] = ""; // Stores all the rows
-
-      // Reset the images to traverse them again
+      // 3) Put 'images' back to its original content for iteration
       strcpy(images, home_page_items[i].content);
 
-      // Use strtok to split the string by the ';' delimiter
+      // 4) Initialize dynamic buffers for the final content
+      //    (current row and all rows)
+      size_t rowBufferCap = 1;
+      size_t rowsContentCap = 1;
+      char *rowBuffer = calloc(rowBufferCap, 1);         // starts as ""
+      char *rowsContentBuffer = calloc(rowsContentCap, 1);// starts as ""
+
+      if (!rowBuffer || !rowsContentBuffer) {
+          LOG_ERROR("Failed to allocate memory for rowBuffer/rowsContentBuffer.");
+          free(images);
+          if (rowBuffer) free(rowBuffer);
+          if (rowsContentBuffer) free(rowsContentBuffer);
+          continue;
+      }
+
       image = strtok(images, ";");
+      counter = 0;
 
-      // Traverse each image
+      // 5) Traverse each image and build cells + rows
       while (image != NULL) {
-        // If counter is 0 or a multiple of columns, prepare a new row
-        if (counter % columns == 0) {
-          // Clear the row buffer for each new row
-          rowBuffer[0] = '\0';
-        }
+          // If "counter" is 0 or a multiple of "columns", we reset the current row
+          if (counter % columns == 0) {
+              // Make rowBuffer an empty string:
+              rowBuffer[0] = '\0';
+          }
 
-        // Prepare the cell content using the template for each image
-        snprintf(cellBuffer, sizeof(cellBuffer), element_gallery_item_html,
-                 table_width, image, image, image_width);
+          // Create the cell content with dynamic_sprintf (or sprintf and a temp buffer)
+          char *cellBuffer = dynamic_sprintf(element_gallery_item_html,
+                                             table_width, image, image, image_width);
+          if (!cellBuffer) {
+              LOG_ERROR("Failed to build cellBuffer.");
+              break; // Error handling
+          }
 
-        // Concatenate the cell content to the row
-        strcat(rowBuffer, cellBuffer);
+          // Concatenate that cell into the row
+          dynamic_strcat(&rowBuffer, &rowBufferCap, cellBuffer);
 
-        counter++;
+          free(cellBuffer); // No longer needed in memory
+          counter++;
 
-        // If the counter is a multiple of columns, close the row
-        if (counter % columns == 0) {
-          // Add the row to the general content of rows
-          char completeRow[1024];
-          snprintf(completeRow, sizeof(completeRow), element_gallery_row_html,
-                   rowBuffer);
-          strcat(rowsContentBuffer, completeRow);
-        }
+          // If a row is completed (multiple of columns), we close that row
+          if (counter % columns == 0) {
+              // Wrap the row with <tr>...</tr>
+              char *completeRow = dynamic_sprintf(element_gallery_row_html, rowBuffer);
+              if (!completeRow) {
+                  LOG_ERROR("Failed to build completeRow.");
+                  break;
+              }
 
-        // Continue with the next token (image)
-        image = strtok(NULL, ";");
+              // Concatenate it into the rows accumulator
+              dynamic_strcat(&rowsContentBuffer, &rowsContentCap, completeRow);
+              free(completeRow);
+          }
+
+          // Next image
+          image = strtok(NULL, ";");
       }
 
-      // If the last row is not complete, add it anyway
+      // 6) If the last row is not complete, add it anyway
       if (counter % columns != 0) {
-        char completeRow[1024];
-        snprintf(completeRow, sizeof(completeRow), element_gallery_row_html,
-                 rowBuffer);
-        strcat(rowsContentBuffer, completeRow);
+          // Wrap the row with <tr>...</tr>
+          char *completeRow = dynamic_sprintf(element_gallery_row_html, rowBuffer);
+          if (completeRow) {
+              dynamic_strcat(&rowsContentBuffer, &rowsContentCap, completeRow);
+              free(completeRow);
+          }
       }
 
-      // Print the final result
-      LOG_DEBUG("%s\n", tableBuffer);
+      // 7) We have all rows in rowsContentBuffer,
+      //    now we put them inside the container <table>...</table>.
+      //    Finally, we place everything into 'itemBuffer' or wherever you store output.
+      char *finalTable = dynamic_sprintf(element_gallery_container_html, rowsContentBuffer);
+      if (!finalTable) {
+          LOG_ERROR("Failed to build finalTable.");
+          // Error handling
+      } else {
+          // Here we format itemBuffer (or whichever buffer you use)
+          itemLength = snprintf(itemBuffer, sizeof(itemBuffer), "%s", finalTable);
+          LOG_DEBUG("Final gallery:\n%s\n", finalTable);
+          free(finalTable);
+      }
 
-      itemLength = snprintf(itemBuffer, sizeof(itemBuffer),
-                            element_gallery_container_html, rowsContentBuffer);
+      // Free everything
+      free(images);
+      free(rowBuffer);
+      free(rowsContentBuffer);
     } else if (strcmp(home_page_items[i].type, "list") == 0) {
       char *item;
       int counter = 0;
       char *items;
 
-      // Allocate memory for items
-      items = malloc(strlen(home_page_items[i].content) + 1); // Allocate enough memory
+      // 1) Dynamic copy of the content
+      items = malloc(strlen(home_page_items[i].content) + 1);
       if (items == NULL) {
           LOG_ERROR("Failed to allocate memory for list items");
-          continue; // Skip this item and move to the next
+          continue; // Skip to the next element
       }
-
-      // Copy the content of home_page_items[i].content
       strcpy(items, home_page_items[i].content);
 
-      // Buffers to store the results
-      char listBuffer[4096] = "";              // Final buffer for the entire list
-      char listItemBuffer[512];                // Temporary buffer for each list item
+      // 2) Initialize a dynamic buffer for the entire list
+      size_t listBufferCap = 1;            // Minimal initial capacity
+      char *listBuffer = calloc(listBufferCap, 1); // Starts as empty string
+      if (!listBuffer) {
+          LOG_ERROR("Failed to allocate memory for listBuffer.");
+          free(items);
+          continue;
+      }
 
-      // Use strtok to split the string by the ';' delimiter
+      // 3) Process each element in the list
       item = strtok(items, ";");
-
-      // Traverse each item in the list
       while (item != NULL) {
-          // Prepare the list item content using the template
-          snprintf(listItemBuffer, sizeof(listItemBuffer), element_list_item_html, item);
+          // Dynamically generate the list item content using the template
+          char *listItemBuffer = dynamic_sprintf(element_list_item_html, item);
+          if (!listItemBuffer) {
+              LOG_ERROR("Failed to build listItemBuffer for item: %s", item);
+              break; // Error handling
+          }
 
-          // Concatenate the list item to the final list buffer
-          strcat(listBuffer, listItemBuffer);
+          // Concatenate the newly generated item into the final list buffer
+          dynamic_strcat(&listBuffer, &listBufferCap, listItemBuffer);
 
+          free(listItemBuffer); // Free the temporary buffer
           counter++;
 
-          // Get the next token (item)
+          // Move to the next token (item)
           item = strtok(NULL, ";");
       }
 
-      // Free the allocated items buffer
-      free(items);
+      // 4) Format the full list using the list container
+      char *finalList = dynamic_sprintf(element_list_container_html, listBuffer);
+      if (!finalList) {
+          LOG_ERROR("Failed to build finalList.");
+          // Error handling: free buffers and continue
+          free(items);
+          free(listBuffer);
+          continue;
+      }
 
-      // Format the full list using the list container template
-      itemLength = snprintf(itemBuffer, sizeof(itemBuffer), element_list_container_html, listBuffer);
+      // Copy the final content into itemBuffer
+      itemLength = snprintf(itemBuffer, sizeof(itemBuffer), "%s", finalList);
+
+      // Debug logs
+      LOG_DEBUG("Final list:\n%s\n", finalList);
+
+      // Free memory
+      free(items);
+      free(listBuffer);
+      free(finalList);
     } else if (strcmp(home_page_items[i].type, "form-start") == 0) {
       const char *extra_data = home_page_items[i].extra_data;
       
@@ -474,7 +589,7 @@ const char *page(const char *id, int epoch) {
     } else if (strcmp(home_page_items[i].type, "button-primary") == 0) {
       const char *extra_data = home_page_items[i].extra_data;
       if (extra_data == NULL || strcmp(extra_data, "") == 0) {
-          extra_data = "submit"; // Set submit in case null or empty
+          extra_data = "submit"; // Default to "submit" if null or empty
       }
 
       itemLength =
@@ -506,6 +621,14 @@ const char *page(const char *id, int epoch) {
                   home_page_items[i].content_id, home_page_items[i].extra_data, 
                   home_page_items[i].content, home_page_items[i].content_id,
                   home_page_items[i].content);
+    } else if (strcmp(home_page_items[i].type, "youtube-embed") == 0) {
+      itemLength =
+          snprintf(itemBuffer, sizeof(itemBuffer), element_youtube_embed_html,
+                  home_page_items[i].content, home_page_items[i].extra_data);
+    } else if (strcmp(home_page_items[i].type, "separator") == 0) {
+      itemLength =
+          snprintf(itemBuffer, sizeof(itemBuffer), element_separator_html,
+                  home_page_items[i].extra_data);
     }
 
     if (itemLength < 0) {
@@ -513,7 +636,6 @@ const char *page(const char *id, int epoch) {
       free(itemsBuffer);
       free(home_page_items);
       free((void *)page_container_html);
-      free((void *)page_html);
       free((void *)element_paragraph_html);
       free((void *)element_tittle_html);
       free((void *)element_image_html);
@@ -535,18 +657,18 @@ const char *page(const char *id, int epoch) {
       free((void *)element_input_text_html);
       free((void *)element_radio_button_html);
       free((void *)element_checkbox_html);
+      free((void *)element_youtube_embed_html);
+      free((void *)element_separator_html);
       return NULL;
     }
 
     // Reallocate memory for itemsBuffer
-    char *tempBuffer = realloc(itemsBuffer, itemsBufferSize + itemLength +
-                                                1); // +1 for null terminator
+    char *tempBuffer = realloc(itemsBuffer, itemsBufferSize + itemLength + 1); // +1 for null terminator
     if (tempBuffer == NULL) {
       perror("Failed to allocate memory for itemsBuffer");
       free(itemsBuffer);
       free(home_page_items);
       free((void *)page_container_html);
-      free((void *)page_html);
       free((void *)element_paragraph_html);
       free((void *)element_tittle_html);
       free((void *)element_image_html);
@@ -568,6 +690,8 @@ const char *page(const char *id, int epoch) {
       free((void *)element_input_text_html);
       free((void *)element_radio_button_html);
       free((void *)element_checkbox_html);
+      free((void *)element_youtube_embed_html);
+      free((void *)element_separator_html);
       return NULL;
     }
 
@@ -581,15 +705,13 @@ const char *page(const char *id, int epoch) {
 
   // Allocate buffer for the full HTML content
   size_t contentBufferSize =
-      snprintf(NULL, 0, page_container_html, itemsBuffer) +
-      1; // +1 for null terminator
+      snprintf(NULL, 0, page_container_html, itemsBuffer) + 1; // +1 for null terminator
   char *contentBuffer = malloc(contentBufferSize);
   if (contentBuffer == NULL) {
     perror("Failed to allocate memory for contentBuffer");
     free(itemsBuffer);
     free(home_page_items);
     free((void *)page_container_html);
-    free((void *)page_html);
     free((void *)element_paragraph_html);
     free((void *)element_tittle_html);
     free((void *)element_image_html);
@@ -611,6 +733,8 @@ const char *page(const char *id, int epoch) {
     free((void *)element_input_text_html);
     free((void *)element_radio_button_html);
     free((void *)element_checkbox_html);
+    free((void *)element_youtube_embed_html);
+    free((void *)element_separator_html);
     return NULL;
   }
 
@@ -625,7 +749,6 @@ const char *page(const char *id, int epoch) {
 
   // Free the templates
   free((void *)page_container_html);
-  free((void *)page_html);
 
   return contentBuffer;
 }

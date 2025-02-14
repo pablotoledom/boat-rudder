@@ -1,55 +1,108 @@
-<table class="boat-rudder__menu__container" width="100%">
-  <tr>
-    <td align="center">
-      <table width="100%">
-        <tr>
-          <td class="boat-rudder__menu__space" width="100"></td>
-          <td width="auto" align="center">
-            <table class="boat-rudder__menu" border="0" cellspacing="0" cellpadding="0" height="100%">
-              <tr>
-                %s
-              </tr>
-            </table>
-          </td>
-          <td class="boat-rudder__menu__space" width="100">
-            <table>
-              <tr>
-                <!-- <td>
-                  <a href="?lang=english">
-                    <img class="boat-rudder__menu__icon-lang" src="/assets/menu2/lang_eng_w.gif" alt="English">
-                  </a>
-                </td> -->
-                <td class="boat-rudder__menu__icon">
-                  <a href="#" class="boat-rudder__menu__icon__link" onclick="updateUrlParam('lang', 'spanish'); return false;">
-                    <img class="boat-rudder__menu__icon-lang" src="/assets/menu2/lang_esp_w.gif" alt="Spanish" border="0">
-                  </a>
-                </td>
-                <!-- <td>
-                  <a href="?contrast=dark">
-                    <img class="boat-rudder__menu__icon-lang" src="/assets/menu2/lang_esp_b.gif" alt="Spanish">
-                  </a>
-                </td> -->
-                <td class="boat-rudder__menu__icon">
-                  <a href="#" class="boat-rudder__menu__icon__link" onclick="updateUrlParam('theme', 'light'); return false;">
-                    <img class="boat-rudder__menu__icon-mode" src="/assets/menu2/show_light.gif" alt="Light theme" border="0">
-                  </a>
-                </td>
-                <!-- <td class="boat-rudder__menu__icon">
-                  <a href="#" onclick="updateUrlParam('theme', 'dark'); return false;">
-                    <img class="boat-rudder__menu__icon-mode" src="/assets/menu2/show_dark.jpg" alt="Spanish">
-                  </a>
-                </td> -->
-              </tr>
-            </table>
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-  <tr>
-    <td></td>
-  </tr>
-  <tr>
-    <td class="boat-rudder__menu__h-separation" align="center" valign="middle" bgcolor="#575757" height="1"></td>
-  </tr>
-</table>
+<div class="boat-rudder__navbar-space">
+  <div class="boat-rudder__navbar">
+    <div class="boat-rudder__navbar__content">
+      <div class="boat-rudder__navbar__title" id="navbarTitle">
+        <a href="/">The Retro Center</a>
+      </div>
+
+      <button class="navbar__toggle" id="navbarToggle">
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      </button>
+
+      <div class="boat-rudder__navbar__menu" id="navbarMenu">
+        %s
+      </div>
+    </div>
+
+    <div class="boat-rudder__navbar__options" id="optionsMenu">
+      %s
+    </div>
+  </div>
+
+  <script>
+    // Variables iniciales
+    let logoOnNavbar = false;
+    const isHome = window.location.pathname === "/";
+    const navbarTitle = document.getElementById('navbarTitle');
+    const navbarMenu = document.getElementById('navbarMenu');
+    const optionsMenu = document.getElementById('optionsMenu');
+
+    if (isHome) {
+      // Actualizar estado en base al scroll
+      const updateScroll = () => {
+        if (window.scrollY > 100) {
+          logoOnNavbar = true;
+          navbarTitle.classList.remove('boat-rudder__navbar__title_onslidelogo');
+          navbarMenu.classList.remove('boat-rudder__navbar__menu_onslidelogo');
+        } else {
+          logoOnNavbar = false;
+          navbarTitle.classList.add('boat-rudder__navbar__title_onslidelogo');
+          navbarMenu.classList.add('boat-rudder__navbar__menu_onslidelogo');
+        }
+      };
+
+      // Cambiar color dinámicamente
+      function changeColor() {
+        const a = Math.floor(Math.random() * 255);
+        const b = Math.floor(Math.random() * 255);
+        const c = Math.floor(Math.random() * 255);
+        return `2px 2px rgb(${a}, ${b}, ${c})`;
+      }
+
+      // Inicializar efectos en el DOM
+      document.addEventListener('DOMContentLoaded', () => {
+        // Configurar estilos iniciales
+        if (isHome) {
+          navbarTitle.style.textShadow = '2px 2px #000';
+        } else {
+          navbarTitle.style.textShadow = changeColor();
+          setInterval(() => {
+            navbarTitle.style.textShadow = changeColor();
+          }, 1000);
+        }
+
+        function throttle(func, limit) {
+          let lastFunc;
+          let lastRan;
+          return function (...args) {
+            const context = this;
+            if (!lastRan) {
+              func.apply(context, args);
+              lastRan = Date.now();
+            } else {
+              clearTimeout(lastFunc);
+              lastFunc = setTimeout(function () {
+                if (Date.now() - lastRan >= limit) {
+                  func.apply(context, args);
+                  lastRan = Date.now();
+                }
+              }, limit - (Date.now() - lastRan));
+            }
+          };
+        }
+
+        // Listener para scroll
+        updateScroll();
+        window.addEventListener('scroll', throttle(updateScroll, 50));
+
+        // Limpieza al recargar la página
+        window.onunload = () => {
+          window.removeEventListener('scroll', updateScroll);
+        };
+      });
+    }
+
+    // Al hacer clic en el botón, alternamos la clase que muestra/oculta el menú
+    const toggleBtn = document.getElementById('navbarToggle');
+    // const navbarMenu = document.getElementById('navbarMenu');
+
+    toggleBtn.addEventListener('click', () => {
+      // Si la clase 'menu--open' no está presente, la agregamos (lo mostramos). 
+      // Si está presente, la removemos (lo ocultamos).
+      navbarMenu.classList.toggle('menu--open');
+      optionsMenu.classList.toggle('menu--open');
+    });
+  </script>
+</div>

@@ -23,8 +23,8 @@ mkdir build
 # Navigate to the 'build' directory
 cd build
 
-# Generate the Makefile using CMake
-cmake ..
+# Generate the Makefile using CMake with debug symbols
+cmake -DCMAKE_BUILD_TYPE=Debug ..
 
 # Build the executable using make
 cmake --build .
@@ -32,7 +32,7 @@ cmake --build .
 # Change directory
 cd ..
 
-# Create a directory names 'bin' for executabled files
+# Create a directory named 'bin' for executables files
 mkdir bin
 
 source ./show/divbar
