@@ -55,7 +55,6 @@ add_executable(boat-rudder ${SOURCES})
 
 # Find CURL package
 find_package(CURL REQUIRED)
-
 if(CURL_FOUND)
     message(STATUS "CURL found: ${CURL_VERSION_STRING}")
     message(STATUS "CURL include dir: ${CURL_INCLUDE_DIRS}")
@@ -78,6 +77,23 @@ endif()
 if(CMAKE_THREAD_LIBS_INIT)
     target_link_libraries(boat-rudder "${CMAKE_THREAD_LIBS_INIT}")
 endif()
+
+# Find OpenSSL package
+find_package(OpenSSL REQUIRED)
+if(OPENSSL_FOUND)
+    message(STATUS "OpenSSL found: ${OPENSSL_VERSION}")
+    message(STATUS "OpenSSL include dir: ${OPENSSL_INCLUDE_DIR}")
+    message(STATUS "OpenSSL library SSL: ${OPENSSL_SSL_LIBRARY}")
+    message(STATUS "OpenSSL library Crypto: ${OPENSSL_CRYPTO_LIBRARY}")
+else()
+    message(FATAL_ERROR "Could not find OpenSSL")
+endif()
+
+# Include OpenSSL headers
+include_directories(${OPENSSL_INCLUDE_DIR})
+
+# Link OpenSSL libraries
+target_link_libraries(boat-rudder OpenSSL::SSL OpenSSL::Crypto)
 
 # Add compiler definitions for POSIX compliance
 add_definitions(-D_XOPEN_SOURCE=700)

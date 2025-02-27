@@ -10,7 +10,7 @@
 // Function to get the home blog items
 HomeBlogItems *getBlogItems(int *blogHomeCount) {
   // Call getData and pass a pointer to blogHomeCount
-  char ***responseList = getData("BlogSummary", "A2", "E20", blogHomeCount);
+  char ***responseList = getData("BlogSummary", "A2", "G20", blogHomeCount);
 
   // Print the table for debugging (optional)
   LOG_DEBUG("\nNumber of Home Blog: %d\n\n", *blogHomeCount);
@@ -62,6 +62,18 @@ HomeBlogItems *getBlogItems(int *blogHomeCount) {
                 sizeof(home_blog_list[i].summary) - 1);
       else
         home_blog_list[i].summary[0] = '\0';
+
+      if (responseList[i][5] != NULL)
+        strncpy(home_blog_list[i].author, responseList[i][5],
+                sizeof(home_blog_list[i].author) - 1);
+      else
+        home_blog_list[i].author[0] = '\0';
+
+      if (responseList[i][6] != NULL)
+        strncpy(home_blog_list[i].summary_date, responseList[i][6],
+                sizeof(home_blog_list[i].summary_date) - 1);
+      else
+        home_blog_list[i].summary_date[0] = '\0';
     } else {
       printf("Row %d is NULL, skipping.\n", i);
     }

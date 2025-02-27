@@ -21,7 +21,8 @@ char ***getData(const char *sheetName, const char *startCell,
   char *range = (char *)malloc(size * sizeof(char));
   if (range == NULL) {
     perror("Failed to allocate memory");
-    exit(1); // Terminate the program if there is not enough memory
+    // exit(1); // Exiting immediately is not ideal.
+    return NULL; // Exit gracefully without crashing the entire program
   }
 
   // Format the string
