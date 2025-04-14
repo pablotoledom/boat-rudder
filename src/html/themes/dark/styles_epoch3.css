@@ -26,9 +26,8 @@ h1 {
 /*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 /* FONTS */
 @font-face {
-  font-family: 'Retronoid';
-  src: url('/assets/fonts/retronoid-italic.woff2') format('woff2'),
-    url('/assets/fonts/retronoid-italic.woff') format('woff');
+  font-family: 'Milonga';
+  src: url('/assets/fonts/Milonga-Regular.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
 }
@@ -38,6 +37,12 @@ h1 {
 
 .boat-rudder__main-container {
   width: 100%;
+}
+
+.boat-rudder__home-content {
+  /* -top: -200px; */
+  background-color: #00000080;
+  position: relative;
 }
 
 /*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
@@ -61,7 +66,7 @@ h1 {
 .boat-rudder__home-blog {
   width: 100%;
   display: flex;
-  background-image: url('/themes/dark/assets/home-blog/matrix-grid_epoch3.png');
+  background-image: url('/themes/dark/assets/home-blog/matrix-grid_epoch3.jpg');
   background-repeat: no-repeat;
   background-size: cover;
   display: flex;
@@ -83,7 +88,7 @@ h1 {
 .boat-rudder__home-blog__item {
   background-color: #0000006b;
   padding: 20px;
-  border: 1px solid #7b0a74;
+  border: 1px solid #349B00;
   margin: 20px 0;
   display: flex;
 }
@@ -107,11 +112,11 @@ h1 {
 }
 
 .boat-rudder__home-blog__item__byline-owner {
-  color: #8fc2ba;
+  color: #F2E200;
 }
 
 .boat-rudder__home-blog__item__byline-date {
-  color: #fba8f6;
+  color: #F9964F;
 }
 
 /*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
@@ -119,7 +124,7 @@ h1 {
 .boat-rudder__footer {
   width: 100%;
   height: 280;
-  background-image: url('/themes/dark/assets/footer/green-grid_epoch3.jpg');
+  background-image: url('/themes/dark/assets/footer/purple-grid_epoch3.jpg');
   background-repeat: no-repeat;
   background-size: cover;
   display: flex;
@@ -139,149 +144,18 @@ h1 {
 /*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
 /* NEW SLIDER */
 .boat-rudder__mainbanner {
-  overflow: hidden;
+  text-align: center;
   position: fixed;
-  width: 100%;
   z-index: -1;
-}
-
-.boat-rudder__mainbanner__sky {
-  position: relative;
-  background-color: #000;
-  width: 100%;
-  top: 0;
-  z-index: -3;
-  display: flex;
-  justify-content: center;
-}
-
-.boat-rudder__mainbanner__skyscraper {
-  position: relative;
-  width: 100%;
-  z-index: -1;
-  overflow: hidden;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  margin-top: -17%;
-}
-
-.boat-rudder__mainbanner__skyscraper_content {
-  position: relative;
-  width: 80%;
-  display: flex;
-  justify-content: center;
-}
-
-.boat-rudder__mainbanner__skyscraper-img {
   width: 100%;
 }
 
-.boat-rudder__mainbanner__skyscraper_content_shadow {
-  opacity: 0.5;
-  position: absolute;
-  width: 80%;
-  transform: skewX(0deg) scale(1, -1);
-  display: flex;
-  justify-content: center;
-  z-index: 1;
-}
-
-.boat-rudder__mainbanner__skyscraper_content_shadow-img {
+.boat-rudder__mainbanner > img {
   width: 100%;
-  transform: scale(1, 1);
-  transform-origin: bottom;
-}
-
-.boat-rudder__mainbanner__moon {
-  background: rgb(243, 203, 73);
-  background: linear-gradient(125deg, rgba(245, 43, 43, 0) 50%, rgb(141, 141, 140) 90%);
-  position: absolute;
-  border-radius: 50%;
-  left: 50%;
-  margin-left: 0px;
-  margin-top: -36%;
-  filter: drop-shadow(0px 0px 37px rgb(255, 255, 255));
-  padding: 17%;
-}
-
-.boat-rudder__mainbanner__sun_reflex {
-  position: absolute;
-  width: 100%;
-  display: flex;
-  justify-content: center;
-}
-
-.boat-rudder__mainbanner__sun__reflex-img {
-  margin-top: -8%;
-  background-color: rgb(238, 159, 42);
-  padding: 19% 16%;
-  position: absolute;
-  border-radius: 50%;
-  opacity: 0.1;
-}
-
-.boat-rudder__mainbanner__sun {
-  position: relative;
-  border-radius: 225px;
-  z-index: -2;
-  filter: drop-shadow(0px 0px 37px rgb(223, 117, 68));
-  padding: 16%;
-}
-
-.boat-rudder__mainbanner__sun-img {
-  width: 100%;
-  position: absolute;
-  margin-top: -36%;
-  margin-left: -50%;
-}
-
-.boat-rudder__mainbanner__floor {
-  background: rgb(0, 0, 0);
-  background: linear-gradient(0deg, rgba(0, 0, 0, 1) 0%, rgb(148, 21, 177) 100%);
-  width: 100%;
-  overflow: hidden;
-  position: relative;
-  z-index: -2;
-  display: flex;
-  justify-content: center;
-  perspective: 500px;
-}
-
-.boat-rudder__mainbanner__floor-content {
-  width: 130%;
-  transform: rotateX(47deg);
-  transform-origin: top center;
-  display: flex;
-  justify-content: center;
-}
-
-.boat-rudder__mainbanner__tracks {
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  position: relative;
-  padding: 20%;
-  width: 100%;
-}
-
-.boat-rudder__mainbanner__tracks-lines {
-  width: 100%;
-  height: 100%;
-  transform-origin: top center;
-  background: linear-gradient(to right, #000 1px, transparent 1px), linear-gradient(to bottom, #000 1px, transparent 1px);
-  background-size: auto, auto;
-  background-size: auto, auto;
-  background-size: auto, auto;
-  background-size: auto, auto;
-  background-size: auto, auto;
-  background-size: 10% 20%;
-  position: absolute;
-  margin-top: -20%;
 }
 
 .boat-rudder__mainbanner__top-padding {
-  padding-top: 50%;
+  padding-top: 35%;
 }
 
 /*XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX */
@@ -298,6 +172,7 @@ h1 {
   background-color: #000;
   position: fixed;
   width: 100%;
+  z-index: 99;
 }
 
 .boat-rudder__navbar__content {
@@ -333,7 +208,7 @@ h1 {
 }
 
 .boat-rudder__navbar__title {
-  font-family: Retronoid;
+  font-family: Milonga;
   transition: all 1s;
   padding: 20px;
   font-size: 28px;
@@ -502,9 +377,19 @@ a.boat-rudder__link {
     margin-left: -8vw;
     margin-top: 13vw;
   }
+
+  .boat-rudder__home-content {
+    /* margin-top: -100px; */
+    background-color: #00000080;
+    position: relative;
+  }
 }
 
 @media (max-width: 800px) {
+  .boat-rudder__home-content {
+    margin-top: 0;
+    position: inherit;
+  }
 
   /* MENU */
   .boat-rudder__navbar__title {
@@ -566,6 +451,15 @@ a.boat-rudder__link {
 }
 
 @media (max-width: 500px) {
+  .boat-rudder__home-content {
+    margin-top: 0;
+    position: inherit;
+  }
+
+  .boat-rudder__mainbanner__top-padding {
+    padding-top: 45%;
+  }
+
   .boat-rudder__navbar__title {
     margin-left: 35px;
   }
