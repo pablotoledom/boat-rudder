@@ -5,7 +5,7 @@
 #include "modules/home_blog/home_blog.h"
 #include "modules/menu/menu.h"
 #include "modules/page/page.h"
-#include "modules/slider/slider.h"
+#include "modules/mainbanner/mainbanner.h"
 #include <stdio.h>   // For snprintf
 #include <stdlib.h>  // For malloc and free
 #include <string.h>  // For strlen
@@ -20,23 +20,23 @@ const char *buildHomeWebSite(char *decoded_url, int epoch, char *lang, char *the
   // Get the HTML content from each module
   const char *html_container = container(epoch);
   const char *html_menu = menu(decoded_url, epoch, lang, theme);
-  const char *html_slider = slider(epoch);
+  const char *html_mainbanner = mainbanner(epoch);
   const char *html_home_blog = home_blog(epoch);
   const char *html_page = page("/", epoch);
 
   // Verify that none of the components are NULL
-  if (!html_container || !html_menu || !html_slider || !html_page || !html_home_blog) {
+  if (!html_container || !html_menu || !html_mainbanner || !html_page || !html_home_blog) {
     LOG_DEBUG("Error in buildHomeWebSite: One or more HTML components are NULL.");
     if (html_container) free((void *)html_container);
     if (html_menu) free((void *)html_menu);
-    if (html_slider) free((void *)html_slider);
+    if (html_mainbanner) free((void *)html_mainbanner);
     if (html_page) free((void *)html_page);
     if (html_home_blog) free((void *)html_home_blog);
     return NULL;
   }
 
   // Calculate the total length needed for the formatted string
-  size_t total_length = snprintf(NULL, 0, html_container, html_menu, html_slider, html_page, html_home_blog) + 1;
+  size_t total_length = snprintf(NULL, 0, html_container, html_menu, html_mainbanner, html_page, html_home_blog) + 1;
   LOG_DEBUG("Total length to allocate: %zu", total_length);
 
   // Allocate memory for the complete HTML
@@ -45,19 +45,19 @@ const char *buildHomeWebSite(char *decoded_url, int epoch, char *lang, char *the
     perror("Failed to allocate memory");
     free((void *)html_container);
     free((void *)html_menu);
-    free((void *)html_slider);
+    free((void *)html_mainbanner);
     free((void *)html_page);
     free((void *)html_home_blog);
     return NULL;
   }
 
   // Build the formatted HTML
-  snprintf(buffer, total_length, html_container, html_menu, html_slider, html_page, html_home_blog);
+  snprintf(buffer, total_length, html_container, html_menu, html_mainbanner, html_page, html_home_blog);
 
   // Free temporary strings
   free((void *)html_container);
   free((void *)html_menu);
-  free((void *)html_slider);
+  free((void *)html_mainbanner);
   free((void *)html_page);
   free((void *)html_home_blog);
 

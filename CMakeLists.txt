@@ -39,7 +39,7 @@ set(SOURCES
     ./src/web-server/request_handler.c
     ./src/modules/container/container.c
     ./src/modules/menu/menu.c
-    ./src/modules/slider/slider.c
+    ./src/modules/mainbanner/mainbanner.c
     ./src/modules/blog/blog.c
     ./src/modules/page/page.c
     ./src/modules/home_blog/home_blog.c
