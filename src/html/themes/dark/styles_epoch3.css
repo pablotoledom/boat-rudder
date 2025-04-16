@@ -66,9 +66,9 @@ h1 {
 .boat-rudder__home-blog {
   width: 100%;
   display: flex;
-  background-image: url('/themes/dark/assets/home-blog/matrix-grid_epoch3.jpg');
-  background-repeat: no-repeat;
-  background-size: cover;
+  background-image: url('/themes/dark/assets/home-blog/matrix-grid_epoch3.gif');
+  background-repeat: repeat-y;
+  background-size: contain;
   display: flex;
   justify-content: center;
   background-attachment: fixed;
