@@ -503,7 +503,7 @@ Admin-only, epoch 3. Summary - the reference is [themes.md](themes.md):
 |---|---|---|
 | `/dashboard/settings` | Site name (replaces `{{SITE_NAME}}` everywhere) and the epoch 2 / epoch 3 favicons | `site_settings.site_name`; `html/favicon2.ico`, `html/favicon3.ico` |
 | `/dashboard/settings/themes` | The list of directories under `html/themes/`: each one's name, *Active* or *Set active*, and *Customize* | `site_settings.active_theme` |
-| `…/themes/<key>/customize` | The theme customizer: pick an epoch, then its logo, navbar, banner, content, home blog, footer and data colors, with a live preview (WML translated for epoch −1) and the public CSS layer in a bottom drawer. `…/themes/<key>` redirects here | everything below, plus `themes.home_blog_background`, `themes.home_blog_item_background` |
+| `…/themes/<key>/customize` | The theme customizer: pick an epoch, then its logo, navbar, banner, content, home blog, footer and data colors, with a live preview (WML translated for epoch −1) and the public CSS layer in a bottom drawer. `…/themes/<key>` redirects here | everything below, plus `themes.home_blog_background`, `themes.home_blog_item_background`, `themes.home_blog_item_color` |
 | `…/themes/<key>/banner`, `…/footer` | Raw markup per epoch (−1…3) in the code editor + the epoch's uploaded images | `themes.banner_html`, `themes.footer_html`, files in `html/content/themes/<key>/` |
 | `…/themes/<key>/logo` | Per-epoch logo: text (0), image (−1, 1, 2; −1 a PNG plus its WBMP twin) or either (3) | `themes.logo` |
 | `…/themes/<key>/css`, `…/admin-css` | A customization layer over each epoch 3 stylesheet, public and admin (one tab each), the original read-only below, *Discard my changes* | `themes.css_custom_epoch3`, `themes.css_admin_custom_epoch3` |

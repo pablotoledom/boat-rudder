@@ -227,6 +227,7 @@ back to the theme's on-disk files or to `THEME_DEFAULTS` in `cms_themes.c`.
   "logo_font": "MyFont",                 // epoch 3 navbar font from the Colors panel
   "home_blog_background":      { "epoch2": "grid.gif", "epoch3": "grid.jpg" },  // "" = theme's own
   "home_blog_item_background": { "epoch2": "card.gif", "epoch3": "card.jpg" },
+  "home_blog_item_color":      { "epoch2": "0" },  // "0" hides epoch 2's item bgcolor; unset = shown
   "css_custom_epoch3": "...",            // layer appended after styles_epoch3.css; "" = none
   "css_admin_custom_epoch3": "..."       // layer appended after styles_admin_epoch3.css
 }

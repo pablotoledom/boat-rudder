@@ -17,7 +17,10 @@ static char *load_template(const char *subpath_fmt, int epoch) {
     return tpl;
 }
 
-static char *render_item(const CmsBlogListItem *item, const char *item_tpl, int epoch) {
+// `show_item_color` only matters on epoch 2: false drops the item <table>'s
+// bgcolor (see cms_get_theme_home_blog_item_color_shown()).
+static char *render_item(const CmsBlogListItem *item, const char *item_tpl, int epoch,
+                         bool show_item_color) {
     char *categories_html = category_tags_render_list(item->category_links, item->category_names,
                                                        item->category_count, epoch);
     if (!categories_html) return NULL;
@@ -74,6 +77,11 @@ static char *render_item(const CmsBlogListItem *item, const char *item_tpl, int 
             // replacing the item card's own background GIF, which Netscape
             // 4 redraws slowly and which repeated once per item (up to
             // HOME_BLOG_LIMIT of them) on the home page compounded that.
+            // Under an item background image (set_table_background()), the
+            // image paints over this color; where the image is transparent
+            // the color shows, unless the theme hides it - then the
+            // attribute is dropped below rather than left empty, which some
+            // browsers of the era read as black.
             char item_bg[8];
             int unused_alpha;
             cms_split_hex_alpha(retro.blog_list_item_background, item_bg, &unused_alpha);
@@ -85,8 +93,13 @@ static char *render_item(const CmsBlogListItem *item, const char *item_tpl, int 
                                    item->header_hide_author ? "" : item->header_author,
                                    categories_html,
                                    retro.blog_list_item_date, item->header_date,
-                                   retro.blog_list_item_border, item_bg)
+                                   retro.blog_list_item_border, show_item_color ? item_bg : "")
                 : NULL;
+            if (result && !show_item_color) {
+                char *stripped = str_replace_first(result, " bgcolor=\"\"", "");
+                free(result);
+                result = stripped;
+            }
         }
         free(thumb);
         free(link_url);
@@ -200,9 +213,10 @@ static char *render_list(int epoch, const char *lang, const char *heading,
         char *item_bg = epoch == EPOCH_MIDDLE
             ? epoch2_image_url(cms_get_theme_home_blog_item_background(request_theme(), EPOCH_MIDDLE))
             : NULL;
+        bool show_item_color = cms_get_theme_home_blog_item_color_shown(request_theme(), epoch);
         items = strdup("");
         for (size_t i = 0; items && i < entry_count; i++) {
-            char *item = render_item(&entries[i], item_tpl, epoch);
+            char *item = render_item(&entries[i], item_tpl, epoch, show_item_color);
             if (item && item_bg) item = set_table_background(item, item_bg);
             items = item ? str_append(items, item) : NULL;
             free(item);

@@ -2,6 +2,7 @@
 #define CMS_THEMES_H
 
 #include "../utils/detect_epoch.h"
+#include <stdbool.h>
 #include <stddef.h>
 
 // A theme's DB-editable color tokens - the 13 variables defined in the
@@ -231,6 +232,17 @@ int cms_update_theme_home_blog_background(const char *key, int epoch, const char
 // "Blog list item" background color.
 char *cms_get_theme_home_blog_item_background(const char *key, int epoch);
 int cms_update_theme_home_blog_item_background(const char *key, int epoch, const char *filename);
+
+// Whether epoch 2's blog list items paint that background color at all (the
+// item <table>'s bgcolor). Epoch 2 has no alpha, so an item image with
+// transparent areas always shows the color through them; hiding it lets the
+// list's own background show instead. Epoch 3 needs no switch: its color
+// carries an alpha. Stored in db.themes.home_blog_item_color.epoch2 as "1" /
+// "0"; unset (the default) shows it. get returns true for any other epoch;
+// update returns -1 for any other epoch, on a DB error, or if mongodb is not
+// ready, 0 on success.
+bool cms_get_theme_home_blog_item_color_shown(const char *key, int epoch);
+int cms_update_theme_home_blog_item_color_shown(const char *key, int epoch, bool shown);
 int cms_update_theme_logo(const char *key, int epoch, const char *html);
 
 // The theme's chosen font-family for the epoch 3 navbar logo text (the

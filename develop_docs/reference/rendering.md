@@ -87,12 +87,16 @@ Everything around it is identical for every page of an epoch, so it lives once p
 | `layout/layout_epoch<N>.html` | doctype, head, `<body>`, `{{PAGE_TITLE}}`, `{{CONTENT}}` |
 | `layout/footer_epoch<N>.html` | the site footer |
 | `layout/lightbox_epoch3.html` | epoch 3 gallery viewer |
+| `layout/body-backdrop_epoch2.html` | the `<body>` backdrop attribute, for the pages that ask for it |
 
 `page_layout_wrap()` (`src/html_builder/page_layout.c`) does the assembly. A fragment opts into a
 part by carrying its marker - `{{FOOTER}}`, `{{LIGHTBOX}}` - and a part with no
 file for that epoch resolves to nothing, so the retro epochs drop the epoch-3 viewers without
-needing an empty file each. `{{BODY_BACKGROUND}}` fills the one attribute that differs between
-epoch-2 pages: home and the blog listing carry the tiled backdrop, content pages do not.
+needing an empty file each. The one part that is not spliced where its marker stands is the
+epoch-2 backdrop: it is an attribute of the layout's `<body>`, so a fragment asks for it with
+`{{BODY_BACKDROP}}` (home and the blog listing do, content pages don't), the marker is removed,
+and the theme's `layout/body-backdrop_epoch2.html` fills the layout's `{{BODY_BACKGROUND}}`.
+Which pages carry a backdrop, and which image, is template content - nothing in C names either.
 
 Two practical consequences. Adding a part to every page of an epoch is a one-file edit, not
 fourteen. And because the `layout/` files are substituted textually rather than through

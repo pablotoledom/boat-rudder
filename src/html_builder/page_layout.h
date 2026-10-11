@@ -22,14 +22,12 @@
 // when present and dropped when the file is missing:
 //   {{FOOTER}}      the site footer
 //   {{LIGHTBOX}}    epoch 3 gallery viewer (page, page-entry)
-//
-// `body_background` fills {{BODY_BACKGROUND}} in the epoch-2 layout, where
-// home and the blog listing carry the tiled backdrop and content pages do
-// not. Pass NULL for none.
+// and one that is removed from the fragment instead, its file going into the
+// layout's {{BODY_BACKGROUND}} (the attributes of epoch 2's <body>):
+//   {{BODY_BACKDROP}}  the page backdrop (page-home, page-blog on epoch 2)
 //
 // Takes ownership of `fragment_html` and frees it. Returns NULL on failure.
-char *page_layout_wrap(char *fragment_html, const char *page_title, int epoch,
-                       const char *body_background);
+char *page_layout_wrap(char *fragment_html, const char *page_title, int epoch);
 
 // The site's uploaded favicons (/dashboard/settings): epoch 2 and 3 each have
 // one file in the static root. page_layout_wrap() points the layout's favicon

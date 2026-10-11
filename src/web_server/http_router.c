@@ -1817,6 +1817,8 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                                         cms_get_theme_home_blog_item_background(id, e);
                                 }
                             }
+                            data.home_blog_item_color_shown =
+                                cms_get_theme_home_blog_item_color_shown(id, EPOCH_MIDDLE);
                             data.css_custom   = cms_get_theme_css_value(id, THEME_CSS_PUBLIC);
                             data.css_original = cms_get_theme_css_original(id, THEME_CSS_PUBLIC);
 
@@ -3627,7 +3629,8 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             // <key>/home-blog/epoch<N>/, "" for the theme's own. Sanitized
             // here with the upload's own rules, since page_layout.c/
             // blog_list.c put them straight into a CSS url('...') / an HTML
-            // attribute.
+            // attribute. Epoch 2's panel also posts "item-background-color"
+            // ("1" when its checkbox is ticked, absent otherwise).
             int epoch = resolve_epoch(&req);
 
             if (epoch != EPOCH_MODERN) {
@@ -3651,6 +3654,13 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                     } else {
                         cms_update_theme_home_blog_background(id, target, file);
                         cms_update_theme_home_blog_item_background(id, target, item_file);
+                        if (target == EPOCH_MIDDLE) {
+                            char show_color[4] = "";
+                            parse_urlencoded_field(req.body, req.body_length, "item-background-color",
+                                                   show_color, sizeof(show_color));
+                            cms_update_theme_home_blog_item_color_shown(id, target,
+                                                                        strcmp(show_color, "1") == 0);
+                        }
                         char redirect_to[128];
                         snprintf(redirect_to, sizeof(redirect_to),
                                  "/dashboard/settings/themes/%s/customize", id);

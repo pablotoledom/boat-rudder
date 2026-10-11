@@ -1142,6 +1142,16 @@
   border-radius: var(--br-admin-radius);
 }
 
+/* A checkbox under a single-image field (epoch 2's "show the background
+   color" for blog list items): inline with its text, not a form row. */
+.boat-rudder-dashboard__asset-check {
+  display: flex; align-items: center; gap: 6px;
+  cursor: pointer; font-size: var(--br-admin-font-sm);
+}
+.boat-rudder-dashboard__asset-check input[type="checkbox"] {
+  width: auto; margin: 0; cursor: pointer;
+}
+
 .boat-rudder-dashboard__asset,
 .boat-rudder-dashboard__asset-empty {
   display: flex;

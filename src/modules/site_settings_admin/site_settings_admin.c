@@ -479,12 +479,23 @@ static char *colors_panel(int epoch, const ThemeEntry *theme) {
 }
 
 // The home blog's background images panel for epoch 2 and 3 (the only ones
-// with them, see cms_themes.h): the list's and each item's. Returns a
-// malloc'd string, or NULL on a missing template / allocation failure.
+// with them, see cms_themes.h): the list's and each item's, plus on epoch 2
+// the switch for the item's background color (settings-home-blog-item-color,
+// epoch 3 colors carry an alpha instead). Returns a malloc'd string, or NULL
+// on a missing template / allocation failure.
 static char *home_blog_panels(int epoch, const char *key, char *const backgrounds[EPOCH_COUNT],
-                              char *const item_backgrounds[EPOCH_COUNT]) {
+                              char *const item_backgrounds[EPOCH_COUNT],
+                              bool item_color_shown) {
     char *panel_tpl = load_template("dashboard/settings/settings-home-blog-panel_epoch%d.html", epoch);
-    if (!panel_tpl) return NULL;
+    char *color_tpl = load_template("dashboard/settings/settings-home-blog-item-color_epoch%d.html", epoch);
+    char *color_switch = color_tpl ? render_template(color_tpl, item_color_shown ? " checked" : "")
+                                   : NULL;
+    free(color_tpl);
+    if (!panel_tpl || !color_switch) {
+        free(panel_tpl);
+        free(color_switch);
+        return NULL;
+    }
 
     static const int EPOCHS[] = { EPOCH_MIDDLE, EPOCH_MODERN };
     char *panels = strdup("");
@@ -495,8 +506,10 @@ static char *home_blog_panels(int epoch, const char *key, char *const background
 
         char *list_bg = html_encode_alloc(backgrounds[i] ? backgrounds[i] : "");
         char *item_bg = html_encode_alloc(item_backgrounds[i] ? item_backgrounds[i] : "");
-        char *panel = list_bg && item_bg ? render_template(panel_tpl, epoch_str, key, list_bg, item_bg)
-                                         : NULL;
+        const char *extra = EPOCHS[ei] == EPOCH_MIDDLE ? color_switch : "";
+        char *panel = list_bg && item_bg
+            ? render_template(panel_tpl, epoch_str, key, list_bg, item_bg, extra)
+            : NULL;
         free(list_bg);
         free(item_bg);
         panels = panel ? str_append(panels, panel) : (free(panels), NULL);
@@ -504,6 +517,7 @@ static char *home_blog_panels(int epoch, const char *key, char *const background
     }
 
     free(panel_tpl);
+    free(color_switch);
     return panels;
 }
 
@@ -520,7 +534,8 @@ char *site_settings_customize_page(int epoch, const ThemeCustomizeData *data) {
     char *banner  = asset_panels(epoch, key, "banner", data->banner, ALL_ASSET_EPOCHS,
                                  ALL_ASSET_EPOCHS_COUNT);
     char *blog    = home_blog_panels(epoch, key, data->home_blog_background,
-                                     data->home_blog_item_background);
+                                     data->home_blog_item_background,
+                                     data->home_blog_item_color_shown);
     char *footer  = asset_panels(epoch, key, "footer", data->footer, ALL_ASSET_EPOCHS,
                                  ALL_ASSET_EPOCHS_COUNT);
     char *colors  = colors_panel(epoch, &data->theme);

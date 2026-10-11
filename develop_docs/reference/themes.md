@@ -119,7 +119,7 @@ the single-purpose pages below still exist and post to the same endpoints.
 | Home banner | `/dashboard/settings/themes/<key>/banner` | `themes.banner_html.<epoch>` (raw markup) | `mainbanner/mainbanner_epoch<N>.html` of that theme |
 | Footer | `…/<key>/footer` | `themes.footer_html.<epoch>` | `layout/footer_epoch<N>.html` |
 | Logo | `…/<key>/logo` | `themes.logo.<epoch>` (structured `CmsLogoConfig`) | legacy `themes.logo_html.<epoch>`, then `menu/menu-logo_epoch<N>.html` |
-| Home blog backgrounds | customizer only | `themes.home_blog_background.<epoch>`, `themes.home_blog_item_background.<epoch>` (epoch 2/3, filenames) | the theme's own (CSS rule / `<table background>`) |
+| Home blog backgrounds | customizer only | `themes.home_blog_background.<epoch>`, `themes.home_blog_item_background.<epoch>` (epoch 2/3, filenames), `themes.home_blog_item_color.epoch2` (`"0"` hides the item's `bgcolor`, so a transparent item image shows the list behind it) | the theme's own (CSS rule / `<table background>`); epoch 2 item color shown |
 
 Banner and footer are one code editor per epoch (−1…3) plus the epoch's uploaded images (§7).
 An empty value restores the on-disk file. Raw markup is inserted with `str_replace_*`, never
@@ -382,7 +382,8 @@ All settings routes are epoch 3 and **admin only**.
    `/themes/dark/assets/...`. Replace `/themes/dark/` with `/themes/<key>/` throughout. (Images
    uploaded from the dashboard live in `html/content/themes/<key>/`, not in the theme.)
 3. Keep the markers the code fills in: `{{CONTENT}}`, `{{PAGE_TITLE}}`, `{{THEME_COLORS}}`
-   (epoch 3 layout), `{{COLOR_*}}` (epoch 1/2 layouts), `{{BODY_BACKGROUND}}`, `{{FOOTER}}`,
+   (epoch 3 layout), `{{COLOR_*}}` (epoch 1/2 layouts), `{{BODY_BACKGROUND}}` (epoch 2 layout),
+   `{{BODY_BACKDROP}}` (epoch 2 `page-home`), `{{FOOTER}}`,
    `{{FOOTER_LOGO}}`, `{{LIGHTBOX}}`, `{{SITE_NAME}}`, and the `%s` slots of
    each fragment in the order its module passes them ([templates-catalog.md](templates-catalog.md)).
 4. Delete any file you don't need to change - it will fall back to `html/templates/`. Files that

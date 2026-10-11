@@ -84,6 +84,7 @@ typedef struct {
     CmsLogoConfig logo[EPOCH_COUNT];          // cms_get_theme_logo_config()
     char *home_blog_background[EPOCH_COUNT];       // epoch 2/3 only, NULL elsewhere
     char *home_blog_item_background[EPOCH_COUNT];  // epoch 2/3 only, NULL elsewhere
+    bool home_blog_item_color_shown;          // epoch 2 only, see cms_themes.h
     char *css_custom;                         // cms_get_theme_css_value(PUBLIC)
     char *css_original;                       // cms_get_theme_css_original(PUBLIC)
 } ThemeCustomizeData;

@@ -470,6 +470,19 @@ int cms_update_theme_home_blog_item_background(const char *key, int epoch, const
     return update_theme_epoch_field(key, "home_blog_item_background", epoch, filename ? filename : "");
 }
 
+bool cms_get_theme_home_blog_item_color_shown(const char *key, int epoch) {
+    if (epoch != EPOCH_MIDDLE) return true;
+    char *value = stored_epoch_field(key, "home_blog_item_color", epoch);
+    bool shown = strcmp(value, "0") != 0;
+    free(value);
+    return shown;
+}
+
+int cms_update_theme_home_blog_item_color_shown(const char *key, int epoch, bool shown) {
+    if (epoch != EPOCH_MIDDLE) return -1;
+    return update_theme_epoch_field(key, "home_blog_item_color", epoch, shown ? "1" : "0");
+}
+
 char *cms_get_theme_logo_font(const char *key) {
     if (!key || !key[0]) return strdup("");
 

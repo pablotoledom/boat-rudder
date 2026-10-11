@@ -11,6 +11,36 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *A
 
 ## v0.0.1
 
+### 2026-10-11
+### Retro DOCTYPEs, charset and the epoch 2 blog item color
+
+**Added**
+- Customizer, Home blog, epoch 2: *Show the background color behind the image* checkbox
+  (`themes.home_blog_item_color.epoch2`, shown by default). Epoch 2 has no alpha, so an item
+  image with transparent areas always showed the color through them; unticked, the item
+  `<table>` gets no `bgcolor` and the list's background shows instead.
+
+**Fixed**
+- Epoch 2 home and blog listing: the page backdrop was a constant in `orchestrator.c` - markup
+  in C, always the dark theme's path, and a file that was never shipped (a 404 on every such
+  page). It is now the theme's `layout/body-backdrop_epoch2.html`, requested by the fragments
+  that want it with `{{BODY_BACKDROP}}`; `page_layout_wrap()` loses its `body_background`
+  argument.
+- Epoch 2 blog list items: the theme's "Blog list item" background color was never painted
+  (the template carried it as a disabled `bgcolor-x`). The item `<table>` now has a real
+  `bgcolor`, under the item image (the theme's own or an uploaded one), as on epoch 3.
+- Epoch 1 gallery page (`gallery-page_epoch1.html`): dropped its `charset=UTF-8` meta, which
+  contradicted the Latin-1 body every epoch 1 page is transcoded to (accents broke in any browser
+  honoring it), and its HTML 2.0 DOCTYPE - no other epoch 1 page carries one, and the markup is
+  HTML 3.2 (tables, `<font>`).
+
+**Changed**
+- Epoch 2 pages (`layout_epoch2.html` in both themes, `gallery-page_epoch2.html`,
+  `redirect_epoch2.html`) declare HTML 4.01 Transitional, without a system identifier, instead
+  of HTML 3.2 (or HTML5 on the redirect page): it is what the markup actually uses (`style`,
+  `font face`, cell `bgcolor`), and browsers still render it in quirks mode, as before. The
+  redirect page now declares its charset with `http-equiv` instead of HTML5's `<meta charset>`.
+
 ### 2026-10-08 … 2026-10-09
 ### Site favicons
 
