@@ -9,8 +9,6 @@ SERVICE_NAME="boat-rudder"
 SERVICE_FILE="$SCRIPT_DIR/boat-rudder.service"
 SYSTEMD_DIR="/etc/systemd/system"
 
-source ./scripts/show/banner
-
 # Require Linux with systemd
 if [ "$(uname -s)" != "Linux" ]; then
     echo "Error: install is only supported on Linux (systemd)."
