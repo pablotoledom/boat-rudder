@@ -24,9 +24,29 @@ client the simplest markup its browser can handle, from WAP-era phones to modern
 |---|---|---|---|
 | -1 | `EPOCH_WML` | WAP 1.x phones | `text/vnd.wap.wml` |
 | 0 | `EPOCH_PRESTANDARD` | Text browsers (e.g. Lynx, w3m, ELinks) - and Cello | `text/html; charset=UTF-8` (bare `text/html` for Cello) |
-| 1 | `EPOCH_EARLY` | Old browsers (table layouts, `<font>`) | `text/html` |
-| 2 | `EPOCH_MIDDLE` | Netscape 4 / MSIE 5 era - table layout, no external stylesheet | `text/html; charset=UTF-8` |
-| 3 | `EPOCH_MODERN` | Modern HTML5 + CSS3 | `text/html; charset=UTF-8` |
+| 1 | `EPOCH_EARLY` | Mosaic, Netscape 1-2, MSIE ≤ 3 (table layouts, `<font>`) | `text/html` |
+| 2 | `EPOCH_MIDDLE` | Netscape 3-4, MSIE 4-11, EdgeHTML, Opera 5-12, and anything below epoch 3's floors - table layout, no external stylesheet | `text/html; charset=UTF-8` |
+| 3 | `EPOCH_MODERN` | Chrome 87+, Firefox 66+, Safari 14.1+ / iOS 14.5+ | `text/html; charset=UTF-8` |
+
+Epoch 3's floors come from its stylesheet, not from the browser's age: the newest CSS that
+`styles_epoch3.css` relies on is `gap` on flex containers and `inset`, which reached all three
+engines in Chrome 87, Firefox 66 and Safari 14.1. Below them the page breaks rather than degrades
+(custom properties, older still, carry every color), so those browsers get epoch 2.
+
+The classification is **data, not code**: an ordered list of rules - tokens the `User-Agent` must
+contain (and must not), the token a version follows, and version tiers giving an epoch and whether
+the browser may use the dashboard - edited from `/dashboard/settings/browsers`
+([dashboard.md](dashboard.md)) and stored in `browser_detection`
+([data-model.md](data-model.md#browser_detection)). Raise a tier there when the stylesheet adopts
+something newer; no recompiling. The rules are held in memory (loaded at startup and after each
+save), so detection never touches the database. Until an admin saves rules of their own, the
+factory rules in `detect_epoch.c` apply - the chain described here. The order of the rules matters, because most modern `User-Agent`s carry
+several engines' tokens: `MSIE`, `Trident/` and EdgeHTML's `Edge/` are tested before `Chrome/`;
+iOS before everything WebKit, since every iOS browser is the system WebKit and only Safari says
+`Version/` (CriOS and FxiOS don't), so the iOS version decides; and a `Mozilla/5` string no engine
+claimed (Konqueror, a legacy crawler) gets epoch 2. The factory test cases - ~50 real
+`User-Agent`s, one per family and version boundary - run in `tests/detect_epoch_test.c`
+(`ctest --test-dir build/debug`) and are the dashboard page's starting test cases.
 
 Epoch 1 (and WML) get a bare `Content-Type: text/html` with **no** `charset` parameter, on
 purpose - live-tested against real NCSA Mosaic 2.1.1, which matches `Content-Type` against its

@@ -50,7 +50,8 @@ the default until a site overrides it.
   GeoLite2) and route - no IP addresses stored.
 - **Dashboard** (modern browsers only): login with Argon2id, session cookies, two roles, an AJAX
   entry editor with server-rendered previews and autosave, plus Categories / Languages / Menu /
-  Users / Media / Site settings (themes, logo, CSS, fonts, epoch preview) / Analytics.
+  Users / Media / Site settings (themes, logo, CSS, fonts, epoch preview, browser detection
+  rules) / Analytics.
 
 For a full tour of the architecture and the CMS, see
 **[develop_docs/boat-rudder.md](develop_docs/boat-rudder.md)**.
@@ -153,6 +154,7 @@ boat-rudder/
 ├── data/                      # Optional GeoLite2-Country.mmdb
 ├── ssl/                       # TLS certificate and key (optional)
 ├── scripts/                   # Build/run/install scripts, systemd unit, logrotate
+├── tests/                     # Unit tests (CTest): ctest --test-dir build/debug
 ├── CHANGELOG.md
 └── develop_docs/              # Project overview, reference docs, plans and diagrams
     ├── reference/             # Reference documentation (see below)

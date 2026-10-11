@@ -12,6 +12,44 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *A
 ## v0.0.1
 
 ### 2026-10-11
+### Browser detection from the dashboard
+
+**Added**
+- `/dashboard/settings/browsers` (Site → Browser detection): the rules that pick each browser's
+  epoch, editable without recompiling - ordered rules of *contains* / *excludes* tokens, the
+  token a version follows, version tiers (epoch, dashboard access), a fallback epoch - plus a
+  *Try a User-Agent* box and test cases that re-run on every edit and show what a change would
+  move. Stored in the new `browser_detection` collection, held in memory (loaded at startup and
+  on save). Until saved, the factory rules apply: the same chain as before, now as data in
+  `detect_epoch.c`.
+- Dashboard browser floor: `/login` and `/dashboard*` now need the `dashboard` flag the rules
+  give the browser (factory: Chrome 111, Firefox 121, Safari / iOS 16.2 - the admin stylesheet's
+  `:has()` and `color-mix()`), not just epoch 3. Read from the real `User-Agent`, so
+  `?preview_epoch=3` can't lift an older browser in; other epoch 3 browsers see "needs a more
+  recent browser".
+- `tests/browser_detection_bson_test.c` (rules to/from BSON and the page's JSON).
+
+**Security**
+- Saving detection rules that would cut the saving browser off the dashboard is refused (`409`).
+
+### 2026-10-11
+### Epoch detection by real capability
+
+**Changed**
+- `detect_epoch()` sends a browser to epoch 3 only from the versions that render its stylesheet:
+  Chrome/Edge 87, Firefox 66, Safari 14.1, iOS 14.5 (flex `gap` and `inset`). Firefox 4-65,
+  Chrome 10-86, older Safari and Android WebViews used to get epoch 3 and lose its layout and
+  colors; they now get epoch 2. Also to epoch 2: EdgeHTML (it carries a `Chrome/` token),
+  Konqueror and any other `Mozilla/5` string no engine claims (legacy crawler UAs included),
+  MSIE 4 (was epoch 1) and Opera 5-12 under its own name (was epoch 1). iOS is decided by the
+  OS version, since CriOS/FxiOS carry no `Chrome/`, `Firefox/` or `Version/` token. Analytics
+  per-epoch counts shift accordingly from this date.
+
+**Added**
+- `tests/detect_epoch_test.c`, the project's first test (CTest): ~50 real `User-Agent`s, one per
+  browser family and version boundary, pinned to their epoch.
+
+### 2026-10-11
 ### Retro DOCTYPEs, charset and the epoch 2 blog item color
 
 **Added**

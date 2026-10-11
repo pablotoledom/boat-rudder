@@ -151,6 +151,10 @@ All **E3, A**. Detailed behavior in [themes.md](themes.md) and [fonts.md](fonts.
 | `POST` | `/dashboard/settings/themes/<key>/css`, `…/admin-css` | `cms_update_theme_css()` | Field `css` (≤ 128 KiB): the layer appended after the theme's file |
 | `POST` | `/dashboard/settings/themes/<key>/css/restore`, `…/admin-css/restore` | `cms_update_theme_css(key, sheet, "")` | *Discard my changes*: an empty layer, the plain file again |
 | `GET` | `/dashboard/settings/preview` | `site_settings_preview_page()` | Iframe + `?preview_epoch=` |
+| `GET` | `/dashboard/settings/browsers` | `browser_detection_admin_page()` | Browser detection rules and test cases, the active ones embedded as JSON |
+| `POST` | `/dashboard/api/browsers/preview` | `browser_detection_admin_preview()` | JSON `{fallback_epoch, rules, cases, try_user_agent}` → each case under the posted and the active rules, the try box's result, `keeps_dashboard`. `400` `{error, position}` if invalid. Saves nothing |
+| `POST` | `/dashboard/api/browsers` | `browser_detection_admin_save()` | Same JSON → stored, in effect at once. `400` if invalid; `409` if the saving browser would lose the dashboard |
+| `POST` | `/dashboard/settings/browsers/reset` | `cms_browser_detection_reset()` | Factory rules again; `302` back |
 | `GET` | `/dashboard/settings/fonts` | `fonts_admin_list()` | Query `error` shows a message |
 | `POST` | `/dashboard/settings/fonts/upload` | `cms_add_font()` | Multipart `name`, `file` (`.ttf/.otf/.woff/.woff2`) |
 | `POST` | `/dashboard/settings/fonts/<id>/delete` | `cms_delete_font()` + file removal | |

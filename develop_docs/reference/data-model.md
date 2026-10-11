@@ -41,6 +41,7 @@ collections). Nothing else in the code base opens a collection.
 | `themes` | Sparse per-theme overrides (colors, banner, footer, logo, CSS) | `cms_themes.c` | `cms_themes.c` |
 | `fonts` | Uploaded font library | `cms_fonts.c` | `cms_fonts.c` |
 | `short_links` | Short codes for QR codes | `short_links.c` | `short_links.c` |
+| `browser_detection` | Singleton: browser detection rules and test cases | `cms_browser_detection.c`, `browser_detection_bson.c` | `cms_browser_detection.c` |
 | `page_visits_daily` | Site-wide analytics, one document per day | `analytics.c` (write), `analytics_view.c` (read) | both `.c` files |
 | `entry_visits_daily` | Per-entry analytics, one document per entry per day | `analytics.c` (write), `analytics_view.c` (read) | both `.c` files |
 
@@ -249,6 +250,31 @@ filename under `html/content/themes/<key>/<logo|home-blog>/epoch<N>/`; on epoch 
 
 Files live under `html/assets/fonts/`. `name` is both the display name and the CSS
 `font-family` value, so it is restricted to `[A-Za-z0-9 _-]` on upload.
+
+### `browser_detection`
+
+```jsonc
+{
+  "_id": "rules",                       // the only document
+  "fallback_epoch": 1,                  // when no rule matches
+  "rules": [                            // ordered: the first match decides
+    { "name": "Chrome", "enabled": true,
+      "contains": ["Chrome/"], "excludes": [],          // case-sensitive substrings
+      "version_after": "Chrome/",                       // "" = no version, no tiers
+      "tiers": [ { "from": "87",  "epoch": 3, "dashboard": false },
+                 { "from": "111", "epoch": 3, "dashboard": true } ],
+      "epoch": 2, "dashboard": false }                  // when no tier is reached
+  ],
+  "cases": [ { "name": "Chrome 86", "user_agent": "Mozilla/5.0 ...", "epoch": 2, "dashboard": false } ],
+  "updated_at": ISODate, "updated_by": ObjectId         // users._id
+}
+```
+
+Written by `/dashboard/settings/browsers` ([dashboard.md](dashboard.md)), read once at startup
+and after each save into memory - never per request. No document (the default, and what *Restore
+factory rules* leaves) means the factory rules in `detect_epoch.c`; so does a document that fails
+to parse or validate (logged). Limits: 64 rules, 32 tokens per list, 8 tiers, 300 cases, tokens
+under 64 bytes, User-Agents under 1 KiB.
 
 ### `short_links`
 

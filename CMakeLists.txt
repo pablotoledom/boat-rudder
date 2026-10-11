@@ -106,6 +106,7 @@ set(SOURCES
     src/modules/entry_editor/entry_editor_blocks.c
     src/modules/media_admin/media_admin.c
     src/modules/site_settings_admin/site_settings_admin.c
+    src/modules/browser_detection_admin/browser_detection_admin.c
     src/modules/fonts_admin/fonts_admin.c
     src/modules/analytics/analytics.c
     src/modules/analytics/geoip.c
@@ -130,6 +131,8 @@ set(SOURCES
     src/db/cms_media_galleries.c
     src/db/short_links.c
     src/db/cms_site_settings.c
+    src/db/browser_detection_bson.c
+    src/db/cms_browser_detection.c
     src/db/cms_themes.c
     src/db/cms_fonts.c
     src/db/language_catalog.c
@@ -168,3 +171,18 @@ if(MAXMINDDB_FOUND)
 endif()
 
 install(TARGETS boat-rudder RUNTIME DESTINATION bin)
+
+# ── Tests ─────────────────────────────────────────────────────────────────────
+# Unit tests (no server, no MongoDB connection), built with the server and run with
+# `ctest --test-dir build/debug`. Not installed.
+
+enable_testing()
+
+add_executable(detect_epoch_test tests/detect_epoch_test.c src/utils/detect_epoch.c)
+target_link_libraries(detect_epoch_test Threads::Threads)
+add_test(NAME detect_epoch COMMAND detect_epoch_test)
+
+add_executable(browser_detection_bson_test tests/browser_detection_bson_test.c
+               src/db/browser_detection_bson.c src/utils/detect_epoch.c)
+target_link_libraries(browser_detection_bson_test PkgConfig::MONGOC Threads::Threads)
+add_test(NAME browser_detection_bson COMMAND browser_detection_bson_test)

@@ -32,21 +32,21 @@ if (Lynx / Cello / Line Mode Browser?) then (yes)
   stop
 endif
 
-if (Mosaic / Netscape 1-2 / MSIE <= 4?) then (yes)
+if (Mosaic / Netscape 1-2 / MSIE <= 3 /\nOpera <= 4?) then (yes)
   #FFFDE7:epoch = 1 (EPOCH_EARLY);
   :Content-Type = text/html (Latin-1 body);
   :Template style: HTML 3.2,\n<table> layout, <font>, bgcolor,\nno CSS / no JS;
   stop
 endif
 
-if (Netscape 4 / MSIE 5-8 / old Firefox-Chrome?) then (yes)
+if (Netscape 3-4 / MSIE 4-11 / EdgeHTML / Opera 5-12 /\nbelow the epoch 3 floors / unknown "Mozilla/3+"?) then (yes)
   #E8F5E9:epoch = 2 (EPOCH_MIDDLE);
   :Content-Type = text/html; charset=UTF-8;
-  :Template style: HTML 3.2 tables,\npresentational attributes;
+  :Template style: HTML 4.01 Transitional tables,\npresentational attributes, inline CSS1;
   stop
 endif
 
-if (Firefox >= 4 / Chrome >= 10 / Safari /\nother "Mozilla/5+"?) then (yes)
+if (Chrome >= 87 / Firefox >= 66 /\nSafari >= 14.1 / iOS >= 14.5?) then (yes)
   #E3F2FD:epoch = 3 (EPOCH_MODERN);
   :Content-Type = text/html; charset=UTF-8;
   :Template style: HTML5 + CSS3\n(styles_epoch3.css), responsive;

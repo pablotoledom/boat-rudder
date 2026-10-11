@@ -1,5 +1,6 @@
 #define _XOPEN_SOURCE 700
 
+#include "db/cms_browser_detection.h"
 #include "db/cms_languages.h"
 #include "db/mongodb_manager.h"
 #include "db/session_manager.h"
@@ -108,6 +109,7 @@ int main(int argc, char *argv[]) {
     } else {
         cms_languages_ensure_seeded();
         session_manager_ensure_indexes();
+        cms_browser_detection_reload();   // without MongoDB the factory rules apply
     }
 
     geoip_init(GEOIP_DEFAULT_DB_PATH);

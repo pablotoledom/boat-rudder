@@ -14,4 +14,11 @@
 // or allocation failure). The caller must free() the returned buffer.
 char *login(int epoch, const char *error_message);
 
+// What /login and /dashboard show a browser that may not use them: on epoch
+// 3, a browser the detection rules don't grant the dashboard (its stylesheet
+// needs more than the public one) - login-unsupported_epoch3.html; on any
+// other epoch, the same "not available" page as login(). Returns a malloc'd
+// fragment, or NULL on failure.
+char *login_unavailable(int epoch);
+
 #endif // LOGIN_H

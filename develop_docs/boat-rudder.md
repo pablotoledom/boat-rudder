@@ -99,10 +99,10 @@ epochs:
 | Epoch | Constant | Era / target browsers | `Content-Type` | Markup style |
 |---|---|---|---|---|
 | `-1` | `EPOCH_WML` | WAP 1.x phones (Nokia, Openwave/UP.Browser, Obigo, and manufacturer-prefix firmware - SIE-, SEC-, MOT-, LG-, Ericsson, Panasonic, SANYO, SHARP, Alcatel, PHILIPS) | `text/vnd.wap.wml` over HTTP; compiled **WBXML** (`application/vnd.wap.wmlc`) through the built-in WAP gateway | WML `<card>` deck, no HTML, text + `<a>` links only, Latin-1, paginated to 860-byte pages |
-| `0` | `EPOCH_PRESTANDARD` | Text browsers (Lynx, Cello, Line Mode Browser) | `text/html; charset=UTF-8` (bare `text/html` + Latin-1 body for Cello) | Bare `<html>`, no styling attributes, `<h1>/<h2>/<hr>/<a>` only |
-| `1` | `EPOCH_EARLY` | Mosaic, Netscape 1-2, MSIE ≤ 4 | `text/html` | HTML 3.2, `<table>` layout, `<font>`, `bgcolor`, no CSS/JS |
-| `2` | `EPOCH_MIDDLE` | Netscape 4, MSIE 5-8, early Firefox/Chrome | `text/html; charset=UTF-8` | HTML 3.2 tables, presentational attributes, no external stylesheet |
-| `3` | `EPOCH_MODERN` | Current browsers | `text/html; charset=UTF-8` | HTML5 + CSS3 (`styles_epoch3.css`), responsive |
+| `0` | `EPOCH_PRESTANDARD` | Text browsers (Lynx, w3m, ELinks, Cello, Line Mode Browser) | `text/html; charset=UTF-8` (bare `text/html` + Latin-1 body for Cello) | A strict HTML 2.0 subset, no DOCTYPE: bare `<html>`, no styling attributes, `<h1>`-`<h6>`/`<p>`/`<hr>`/`<a>`/`<ul>`/`<pre>`; no CSS/JS |
+| `1` | `EPOCH_EARLY` | Mosaic, Netscape 1-2, MSIE ≤ 3, Opera ≤ 4 | `text/html` | HTML 3.2 (`<table>` layout, `<font size/color>`, body colors) plus two HTML 4.0 Transitional attributes, `<font face>` and cell `bgcolor` - full fidelity from Netscape 3 / MSIE 3; no CSS/JS |
+| `2` | `EPOCH_MIDDLE` | Netscape 3-4, MSIE 4-11, EdgeHTML, Opera 5-12, and every browser below epoch 3's floors | `text/html; charset=UTF-8` | HTML 4.01 Transitional tables with IE/Netscape extensions (`bordercolor`, table `background`, body margins); an inline CSS1 `<style>` (plus CSS2 `a:hover`, IE `expression()`); one JavaScript 1.0 handler; no external stylesheet |
+| `3` | `EPOCH_MODERN` | Chrome/Edge 87+, Firefox 66+, Safari 14.1+ / iOS 14.5+ | `text/html; charset=UTF-8` | HTML5; CSS of 2020-21 (custom properties, grid, flex `gap`, `inset`) in `styles_epoch3.css`; ES2015 JavaScript. The dashboard needs more: `:has()`, `color-mix()` (Chrome 111, Firefox 121, Safari 16.2) |
 
 Classification is a simple, dependency-free substring/version heuristic over `User-Agent`, with
 epoch `1` as the fallback for anything unrecognized (better to render an old-but-working page
@@ -155,21 +155,21 @@ if (Lynx / Cello / Line Mode Browser?) then (yes)
   stop
 endif
 
-if (Mosaic / Netscape 1-2 / MSIE <= 4?) then (yes)
+if (Mosaic / Netscape 1-2 / MSIE <= 3 /\nOpera <= 4?) then (yes)
   #FFFDE7:epoch = 1 (EPOCH_EARLY);
   :Content-Type = text/html (Latin-1 body);
   :Template style: HTML 3.2,\n<table> layout, <font>, bgcolor,\nno CSS / no JS;
   stop
 endif
 
-if (Netscape 4 / MSIE 5-8 / old Firefox-Chrome?) then (yes)
+if (Netscape 3-4 / MSIE 4-11 / EdgeHTML / Opera 5-12 /\nbelow the epoch 3 floors / unknown "Mozilla/3+"?) then (yes)
   #E8F5E9:epoch = 2 (EPOCH_MIDDLE);
   :Content-Type = text/html; charset=UTF-8;
-  :Template style: HTML 3.2 tables,\npresentational attributes;
+  :Template style: HTML 4.01 Transitional tables,\npresentational attributes, inline CSS1;
   stop
 endif
 
-if (Firefox >= 4 / Chrome >= 10 / Safari /\nother "Mozilla/5+"?) then (yes)
+if (Chrome >= 87 / Firefox >= 66 /\nSafari >= 14.1 / iOS >= 14.5?) then (yes)
   #E3F2FD:epoch = 3 (EPOCH_MODERN);
   :Content-Type = text/html; charset=UTF-8;
   :Template style: HTML5 + CSS3\n(styles_epoch3.css), responsive;

@@ -5,6 +5,15 @@
 #include "../../utils/template_utils.h"
 #include <stdlib.h>
 
+char *login_unavailable(int epoch) {
+    if (epoch != EPOCH_MODERN) return login(epoch, NULL);
+
+    char *path = generate_url_theme("login/login-unsupported_epoch%d.html", epoch);
+    char *tpl  = path ? read_file_to_string(path) : NULL;
+    free(path);
+    return tpl;
+}
+
 char *login(int epoch, const char *error_message) {
     char *path = generate_url_theme("login/login_epoch%d.html", epoch);
     if (!path) return NULL;

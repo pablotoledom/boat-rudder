@@ -1,0 +1,148 @@
+<section class="boat-rudder-dashboard boat-rudder-browsers" id="browserDetection" data-state="%1$s">
+  <nav class="boat-rudder-dashboard__breadcrumb" aria-label="Breadcrumb">
+    <ol><li><a href="/dashboard">Dashboard</a></li><li><a href="/dashboard/settings">Site settings</a></li></ol>
+  </nav>
+  <div class="boat-rudder-dashboard__panel-header">
+    <h1>Browser detection</h1>
+    <div class="boat-rudder-dashboard__panel-actions">
+      <span class="boat-rudder-badge">%2$s</span>
+      <form method="POST" action="/dashboard/settings/browsers/reset" class="boat-rudder-browsers__reset">
+        <button class="boat-rudder-btn" type="submit">Restore factory rules</button>
+      </form>
+    </div>
+  </div>
+  <p class="boat-rudder-dashboard__hint">Which epoch each visitor's browser gets, and which browsers may
+     use the dashboard. Rules are checked top to bottom; the first one whose <em>contains</em>
+     has a token found in the User-Agent (and whose <em>excludes</em> has none) decides.
+     Tokens are case-sensitive and matched as plain text. If the rule reads a version, the
+     highest tier that version reaches gives the epoch; otherwise the rule's own epoch applies.
+     Raise the epoch 3 tiers when the public stylesheet starts using newer CSS.</p>
+
+  <div class="boat-rudder-alert boat-rudder-alert--error" id="browsersError" role="alert" hidden></div>
+
+  <section class="boat-rudder-dashboard__panel">
+    <h2>Try a User-Agent</h2>
+    <div class="boat-rudder-browsers__try boat-rudder-card">
+      <textarea class="boat-rudder-input boat-rudder-browsers__ua" id="browsersTryUa" rows="2"
+                spellcheck="false">%3$s</textarea>
+      <p class="boat-rudder-browsers__try-result" id="browsersTryResult" aria-live="polite"></p>
+      <button class="boat-rudder-btn boat-rudder-btn--sm" type="button" id="browsersTryAdd">Add as a test case</button>
+    </div>
+  </section>
+
+  <section class="boat-rudder-dashboard__panel">
+    <div class="boat-rudder-dashboard__panel-header">
+      <h2>Rules</h2>
+      <div class="boat-rudder-dashboard__panel-actions">
+        <button class="boat-rudder-btn" type="button" id="browsersAddRule">+ Rule</button>
+      </div>
+    </div>
+    <ol class="boat-rudder-browsers__rules" id="browsersRules"></ol>
+    <div class="boat-rudder-browsers__fallback boat-rudder-card">
+      <label for="browsersFallback">No rule matches</label>
+      <select class="boat-rudder-input boat-rudder-input--sm" id="browsersFallback" data-epoch-select></select>
+    </div>
+  </section>
+
+  <section class="boat-rudder-dashboard__panel">
+    <div class="boat-rudder-dashboard__panel-header">
+      <h2>Test cases</h2>
+      <div class="boat-rudder-dashboard__panel-actions">
+        <span class="boat-rudder-badge" id="browsersCasesSummary"></span>
+        <button class="boat-rudder-btn" type="button" id="browsersAddCase">+ Test case</button>
+      </div>
+    </div>
+    <p class="boat-rudder-dashboard__hint">Real User-Agents and the epoch they must get. They run
+       against the rules as you edit them; <em>Result</em> also says when an edit changes what a
+       case gets today.</p>
+    <div class="boat-rudder-dashboard__table-scroll">
+      <table class="boat-rudder-dashboard__table boat-rudder-browsers__cases">
+        <thead>
+          <tr><th>Name</th><th>User-Agent</th><th>Epoch</th><th>Dashboard</th><th>Result</th><th></th></tr>
+        </thead>
+        <tbody id="browsersCases"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="boat-rudder-browsers__savebar">
+    <span class="boat-rudder-browsers__dirty" id="browsersDirty" hidden>Unsaved changes</span>
+    <button class="boat-rudder-btn" type="button" id="browsersDiscard">Discard changes</button>
+    <button class="boat-rudder-btn boat-rudder-btn--primary" type="button" id="browsersSave">Save</button>
+  </div>
+
+  <template id="browsersEpochOptions">
+    <option value="-1">-1 - WAP (WML)</option>
+    <option value="0">0 - Text</option>
+    <option value="1">1 - Early</option>
+    <option value="2">2 - Middle</option>
+    <option value="3">3 - Modern</option>
+  </template>
+
+  <template id="browsersRuleTemplate">
+    <li class="boat-rudder-browsers__rule boat-rudder-card">
+      <details>
+        <summary class="boat-rudder-browsers__rule-summary">
+          <span class="boat-rudder-browsers__rule-position"></span>
+          <strong class="boat-rudder-browsers__rule-name"></strong>
+          <span class="boat-rudder-browsers__rule-outline"></span>
+          <span class="boat-rudder-badge boat-rudder-browsers__rule-off">off</span>
+        </summary>
+        <div class="boat-rudder-browsers__rule-body">
+          <div class="boat-rudder-browsers__rule-head">
+            <label>Name <input class="boat-rudder-input boat-rudder-input--sm" data-field="name" maxlength="63"></label>
+            <label class="boat-rudder-browsers__check"><input type="checkbox" data-field="enabled"> Enabled</label>
+            <span class="boat-rudder-browsers__rule-actions">
+              <button class="boat-rudder-btn boat-rudder-btn--sm" type="button" data-action="up" title="Move up">&#8593;</button>
+              <button class="boat-rudder-btn boat-rudder-btn--sm" type="button" data-action="down" title="Move down">&#8595;</button>
+              <button class="boat-rudder-btn boat-rudder-btn--sm boat-rudder-btn--danger" type="button" data-action="delete">Delete</button>
+            </span>
+          </div>
+          <div class="boat-rudder-browsers__rule-grid">
+            <label>Contains any of
+              <textarea class="boat-rudder-input boat-rudder-browsers__tokens" data-field="contains" rows="3" spellcheck="false"></textarea>
+            </label>
+            <label>Excludes (none of)
+              <textarea class="boat-rudder-input boat-rudder-browsers__tokens" data-field="excludes" rows="3" spellcheck="false"></textarea>
+            </label>
+          </div>
+          <p class="boat-rudder-dashboard__hint">One token per line. &#9251; stands for a space - spaces count (<code>MSIE&#9251;</code> is not <code>MSIE</code>).</p>
+          <label>Read the version after
+            <input class="boat-rudder-input boat-rudder-input--sm boat-rudder-browsers__token" data-field="version_after" maxlength="63" spellcheck="false">
+          </label>
+          <table class="boat-rudder-browsers__tiers">
+            <thead><tr><th>From version</th><th>Epoch</th><th>Dashboard</th><th></th></tr></thead>
+            <tbody data-list="tiers"></tbody>
+          </table>
+          <button class="boat-rudder-btn boat-rudder-btn--sm" type="button" data-action="add-tier">+ Tier</button>
+          <div class="boat-rudder-browsers__otherwise">
+            <span>Otherwise</span>
+            <select class="boat-rudder-input boat-rudder-input--sm" data-field="epoch" data-epoch-select></select>
+            <label class="boat-rudder-browsers__check"><input type="checkbox" data-field="dashboard"> Dashboard</label>
+          </div>
+        </div>
+      </details>
+    </li>
+  </template>
+
+  <template id="browsersTierTemplate">
+    <tr>
+      <td><input class="boat-rudder-input boat-rudder-input--sm" data-field="from" maxlength="15" placeholder="87 or 14.1" spellcheck="false"></td>
+      <td><select class="boat-rudder-input boat-rudder-input--sm" data-field="epoch" data-epoch-select></select></td>
+      <td><input type="checkbox" data-field="dashboard" aria-label="Dashboard"></td>
+      <td><button class="boat-rudder-btn boat-rudder-btn--sm" type="button" data-action="remove-tier">Remove</button></td>
+    </tr>
+  </template>
+
+  <template id="browsersCaseTemplate">
+    <tr>
+      <td><input class="boat-rudder-input boat-rudder-input--sm" data-field="name" maxlength="63"></td>
+      <td><textarea class="boat-rudder-input boat-rudder-browsers__ua" data-field="user_agent" rows="2" spellcheck="false"></textarea></td>
+      <td><select class="boat-rudder-input boat-rudder-input--sm" data-field="epoch" data-epoch-select></select></td>
+      <td><input type="checkbox" data-field="dashboard" aria-label="Dashboard"></td>
+      <td class="boat-rudder-browsers__result" data-result></td>
+      <td><button class="boat-rudder-btn boat-rudder-btn--sm" type="button" data-action="remove-case">Remove</button></td>
+    </tr>
+  </template>
+</section>
+<script src="/assets/js/browser-detection.js" defer></script>

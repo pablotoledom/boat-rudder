@@ -95,7 +95,8 @@ listeners serve the same site.
 | Logout | `POST /logout` (CSRF-checked whenever a session cookie is present; `GET` → `405`) deletes the session document and clears the cookie |
 | Expiry | Checked on every lookup (`validate_session()`). At startup `session_manager_ensure_indexes()` creates a TTL index `{expires_at: 1}, {expireAfterSeconds: 0}` (MongoDB then purges expired sessions about once a minute), a unique index on `token`, and deletes the backlog of already-expired sessions |
 | CSRF | Every non-`GET`/`HEAD`/`OPTIONS` request through `require_dashboard_session()` (i.e. every dashboard write) must carry the session's CSRF token, else `403`. See [CSRF protection](#csrf-protection) |
-| Modern browsers only | `/login` POST and every `/dashboard*` route require epoch 3 (server-side, not just hidden links) |
+| Modern browsers only | `/login` POST and every `/dashboard*` route require epoch 3 *and* the `dashboard` flag the browser detection rules give the real `User-Agent` (`dashboard_allowed()`, server-side, not just hidden links) - so `?preview_epoch=3` cannot lift an older browser in. Other epoch 3 browsers see "needs a more recent browser" |
+| Detection rules lock-out | Saving browser detection rules is refused (`409`) when the saving browser would lose the dashboard under them. Last resort: delete the `browser_detection` document and restart - the factory rules apply |
 | MongoDB down | Dashboard and login answer `503`, never "logged in" |
 
 ### Roles
