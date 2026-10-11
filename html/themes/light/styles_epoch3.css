@@ -645,6 +645,7 @@ a.boat-rudder-social-network img { border-radius: 4px; flex-shrink: 0; }
   border-right: 1px solid var(--br-color-code-line-number);
   color: var(--br-color-code-line-number);
   text-align: right;
+  -webkit-user-select: none;  /* Safari has only the prefixed one */
   user-select: none;
 }
 

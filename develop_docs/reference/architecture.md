@@ -139,6 +139,7 @@ boat-rudder/
 │       ├── http_utils.c/h               # MIME detection, URL encode/decode, HTML encode,
 │       │                                # path sanitizer, trusted proxy check
 │       ├── detect_epoch.c/h             # User-Agent → epoch: rule engine, factory rules, active set
+│       ├── css_compat.c/h               # CSS features vs. the detection rules' floors
 │       ├── request_lang.c/h             # Per-request content language + request path
 │       ├── request_theme.c/h            # Per-request theme (?theme= → cookie → DB → config)
 │       ├── request_user.c/h             # Per-request signed-in user's display name

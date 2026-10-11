@@ -6,6 +6,9 @@
 #include "../../utils/http_utils.h"
 #include "../../utils/read_file.h"
 #include "../../utils/template_utils.h"
+#include "../../utils/css_compat.h"
+#include "../../utils/theme_catalog.h"
+#include "../../db/cms_themes.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -131,6 +134,45 @@ static int keeps_dashboard(const BrowserDetection *d, const char *user_agent) {
     return m.epoch == EPOCH_MODERN && m.dashboard;
 }
 
+// "stylesheets": every theme's public and admin epoch 3 stylesheet, as served
+// (original + dashboard layer), checked against `rules` (css_compat.h) - one
+// entry per feature some browser would still be served without.
+static void append_stylesheet_warnings(bson_t *out, const BrowserDetection *rules) {
+    char **keys = NULL;
+    size_t key_count = 0;
+    list_theme_keys(&keys, &key_count);
+
+    bson_t list;
+    uint32_t n = 0;
+    bson_append_array_begin(out, "stylesheets", -1, &list);
+    for (size_t k = 0; k < key_count; k++) {
+        for (int s = 0; s < 2; s++) {
+            ThemeCssSheet sheet = s ? THEME_CSS_ADMIN : THEME_CSS_PUBLIC;
+            char *css = cms_get_theme_css(keys[k], sheet);
+            CssCompatWarning warnings[CSS_COMPAT_WARNINGS_MAX];
+            size_t count = css ? css_compat_check(css, rules, sheet == THEME_CSS_ADMIN, warnings,
+                                                  CSS_COMPAT_WARNINGS_MAX)
+                               : 0;
+            free(css);
+            for (size_t i = 0; i < count; i++) {
+                char index[16];
+                const char *key;
+                bson_uint32_to_string(n++, &key, index, sizeof(index));
+                bson_t item;
+                bson_append_document_begin(&list, key, -1, &item);
+                bson_append_utf8(&item, "theme", -1, keys[k], -1);
+                bson_append_utf8(&item, "sheet", -1, s ? "admin" : "public", -1);
+                bson_append_utf8(&item, "feature", -1, warnings[i].feature, -1);
+                bson_append_utf8(&item, "needs", -1, warnings[i].needs, -1);
+                bson_append_utf8(&item, "still_served", -1, warnings[i].still_served, -1);
+                bson_append_document_end(&list, &item);
+            }
+        }
+    }
+    bson_append_array_end(out, &list);
+    free_theme_keys(keys, key_count);
+}
+
 char *browser_detection_admin_preview(const char *body, size_t body_length,
                                       const char *request_user_agent, const char **status) {
     BrowserDetection *posted = malloc(sizeof(*posted));
@@ -169,6 +211,7 @@ char *browser_detection_admin_preview(const char *body, size_t body_length,
             browser_detection_classify(posted, bson_iter_utf8(&it, NULL), &m);
             append_match(&out, "try", &m);
         }
+        append_stylesheet_warnings(&out, posted);
         bson_append_bool(&out, "keeps_dashboard", -1,
                          keeps_dashboard(posted, request_user_agent ? request_user_agent : ""));
 

@@ -65,6 +65,7 @@ set(SOURCES
     src/utils/log.c
     src/utils/http_utils.c
     src/utils/detect_epoch.c
+    src/utils/css_compat.c
     src/utils/read_file.c
     src/utils/generate_url_theme.c
     src/utils/template_utils.c
@@ -186,3 +187,7 @@ add_executable(browser_detection_bson_test tests/browser_detection_bson_test.c
                src/db/browser_detection_bson.c src/utils/detect_epoch.c)
 target_link_libraries(browser_detection_bson_test PkgConfig::MONGOC Threads::Threads)
 add_test(NAME browser_detection_bson COMMAND browser_detection_bson_test)
+
+add_executable(css_compat_test tests/css_compat_test.c src/utils/css_compat.c src/utils/detect_epoch.c)
+target_link_libraries(css_compat_test Threads::Threads)
+add_test(NAME css_compat COMMAND css_compat_test WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

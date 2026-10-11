@@ -2311,3 +2311,6 @@ h6.boat-rudder-entry-editor-preview__title { font-size: 13px; font-weight: 600; 
   background: var(--br-admin-surface); border-top: 1px solid var(--br-admin-border);
 }
 .boat-rudder-browsers__dirty { margin-right: auto; color: var(--br-admin-accent); font-size: var(--br-admin-font-sm); }
+.boat-rudder-browsers__compat { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: var(--br-admin-font-sm); color: var(--br-admin-danger); }
+.boat-rudder-browsers__compat-ok { color: var(--br-admin-success); font-size: var(--br-admin-font-sm); }
+.boat-rudder-dashboard__css-compat ul { margin: 6px 0 0; padding-left: 18px; }

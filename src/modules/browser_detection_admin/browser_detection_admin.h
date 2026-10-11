@@ -19,7 +19,9 @@ char *browser_detection_admin_page(int epoch, const char *user_agent);
 // a malloc'd JSON body - {error, position} when the rules don't parse or
 // validate; else each case's result under the posted rules and under the
 // active ones, the try box's result, and whether `request_user_agent` keeps
-// the dashboard under the posted rules. `*status` gets the HTTP status line.
+// the dashboard under the posted rules, and every theme's stylesheet
+// features some browser would still be served without (css_compat.h).
+// `*status` gets the HTTP status line.
 // NULL only on allocation failure.
 char *browser_detection_admin_preview(const char *body, size_t body_length,
                                       const char *request_user_agent, const char **status);

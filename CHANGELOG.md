@@ -28,6 +28,18 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *A
   `?preview_epoch=3` can't lift an older browser in; other epoch 3 browsers see "needs a more
   recent browser".
 - `tests/browser_detection_bson_test.c` (rules to/from BSON and the page's JSON).
+- CSS compatibility check (`src/utils/css_compat.c`): ~20 CSS features with their first Chrome,
+  Firefox and Safari versions (`:has()`, `color-mix()`, container queries, nesting, `dvh`, ...)
+  checked against the detection rules by classifying the version just below each - so it works
+  with whatever rules are saved. Shown on the theme CSS editor (with the active rules) and as a
+  *Stylesheet check* on the Browser detection page (with the rules being edited, every theme,
+  public and admin). `tests/css_compat_test.c` also keeps the shipped stylesheets within the
+  factory floors.
+
+**Changed**
+- UP.Browser 3.x (HDML only, never WML) is no longer sent WML: excluded from the WAP rule.
+- `styles_epoch3.css`: `-webkit-user-select` next to `user-select`, so code line numbers stay
+  out of a copy on Safari too.
 
 **Security**
 - Saving detection rules that would cut the saving browser off the dashboard is refused (`409`).

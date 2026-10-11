@@ -46,12 +46,14 @@ static const FactoryRule FACTORY_RULES[] = {
     // Motorola, "LG-", Ericsson also matching SonyEricsson, and the brands
     // written in caps). Several are still-shipping brands whose Android UAs
     // would collide - excluded by "AppleWebKit", which every modern mobile
-    // browser carries and no WAP 1.x one ever did.
+    // browser carries and no WAP 1.x one ever did. UP.Browser 3.x is excluded
+    // too: it speaks only HDML, never WML, so it is not served at all (it falls
+    // to the fallback, which it can't render either) - 4.x to 7.x are WML 1.1.
     { "WAP 1.x",
       TOKENS("Wap", "WAP", "Nokia", "nokia", "UP.Browser", "UP/", "Obigo", "Ericsson",
              "SIE-", "SEC-", "MOT-", "LG-", "Alcatel", "Panasonic", "SANYO", "SHARP",
              "PHILIPS"),
-      TOKENS("AppleWebKit"), "", { { "", 0, false } }, 0, EPOCH_WML, false },
+      TOKENS("AppleWebKit", "UP.Browser/3", "UP/3"), "", { { "", 0, false } }, 0, EPOCH_WML, false },
 
     // Text-mode browsers. Cello is a 1993 graphical browser that is text-only
     // in practice; its pre-Unicode charset is handled by request_charset.c.
@@ -137,6 +139,8 @@ static const FactoryCase FACTORY_CASES[] = {
     { "Nokia 7110", "Nokia7110/1.0 (05.01)", EPOCH_WML, false },
     { "UP.Browser 4", "SIE-S35/1.0 UP/4.1.8c UP.Browser/4.1.8c-XXXX UP.Link/4.2.2.1", EPOCH_WML, false },
     { "Ericsson R380", "R380 2.0 WAP1.1", EPOCH_WML, false },
+    { "UP.Browser 3 (HDML only, not served)", "UP.Browser/3.1-UPG1 UP.Link/3.2", EPOCH_EARLY, false },
+    { "UP.Browser 6.1", "SAMSUNG-SGH-E700/BSI UP.Browser/6.1.0.6 (GUI) MMP/1.0", EPOCH_WML, false },
     { "Nokia 6233, UC Browser", "nokia6233/2.0 (05.60) Profile/MIDP-2.0 Configuration/CLDC-1.1 UCWEB/7.9", EPOCH_WML, false },
     { "Nokia Android (WebKit, not WAP)",
       "Mozilla/5.0 (Linux; Android 13; Nokia G21) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",

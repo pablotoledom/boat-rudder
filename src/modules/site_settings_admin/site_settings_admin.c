@@ -5,6 +5,7 @@
 #include "../../utils/http_utils.h"
 #include "../../utils/read_file.h"
 #include "../../utils/template_utils.h"
+#include "../../utils/css_compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -319,6 +320,35 @@ char *site_settings_preview_page(int epoch) {
     return load_template("dashboard/settings/preview_epoch%d.html", epoch);
 }
 
+// The browsers below the floors of the features `css` uses that the active
+// detection rules still serve it to (css_compat.h): a settings-css-compat
+// block, "" when there are none. NULL only on allocation failure.
+static char *css_compat_block(int epoch, const char *css, bool dashboard) {
+    BrowserDetection *rules = browser_detection_active_copy();
+    if (!rules) return NULL;
+    CssCompatWarning warnings[CSS_COMPAT_WARNINGS_MAX];
+    size_t count = css_compat_check(css, rules, dashboard, warnings, CSS_COMPAT_WARNINGS_MAX);
+    free(rules);
+    if (count == 0) return strdup("");
+
+    char *block_tpl = load_template("dashboard/settings/settings-css-compat_epoch%d.html", epoch);
+    char *item_tpl  = load_template("dashboard/settings/settings-css-compat-item_epoch%d.html", epoch);
+    char *items = (block_tpl && item_tpl) ? strdup("") : NULL;
+    for (size_t i = 0; items && i < count; i++) {
+        char *feature = html_encode_alloc(warnings[i].feature);
+        char *item = feature ? render_template(item_tpl, feature, warnings[i].needs,
+                                               warnings[i].still_served) : NULL;
+        items = item ? str_append(items, item) : (free(items), NULL);
+        free(item);
+        free(feature);
+    }
+    char *block = items ? render_template(block_tpl, items) : NULL;
+    free(items);
+    free(block_tpl);
+    free(item_tpl);
+    return block;
+}
+
 char *site_settings_css_page(int epoch, const char *key, ThemeCssSheet sheet, const char *custom,
                              const char *original) {
     char *page_tpl = load_template("dashboard/settings/settings-css_epoch%d.html", epoch);
@@ -334,16 +364,23 @@ char *site_settings_css_page(int epoch, const char *key, ThemeCssSheet sheet, co
 
     char *encoded_custom   = html_encode_alloc(custom ? custom : "");
     char *encoded_original = html_encode_alloc(original ? original : "");
+
+    // What is served is the original with the layer appended - check both.
+    char *served = render_template("%s\n%s", original ? original : "", custom ? custom : "");
+    char *compat = served ? css_compat_block(epoch, served, sheet == THEME_CSS_ADMIN) : NULL;
+    free(served);
+
     char *result = NULL;
-    if (encoded_custom && encoded_original) {
+    if (encoded_custom && encoded_original && compat) {
         static const char *ACTIVE_TAB = " boat-rudder-tabs__tab--active";
         int is_admin = sheet == THEME_CSS_ADMIN;
         result = render_template(page_tpl, key,
                                  is_admin ? "" : ACTIVE_TAB, is_admin ? ACTIVE_TAB : "",
                                  status, is_admin ? "admin-css" : "css", encoded_custom,
                                  is_customized ? "" : " hidden", encoded_original,
-                                 cms_theme_css_file(sheet));
+                                 cms_theme_css_file(sheet), compat);
     }
+    free(compat);
     free(encoded_custom);
     free(encoded_original);
     free(page_tpl);

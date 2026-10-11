@@ -25,6 +25,8 @@
   var errorBox = document.getElementById('browsersError');
   var summary = document.getElementById('browsersCasesSummary');
   var dirtyNote = document.getElementById('browsersDirty');
+  var compatList = document.getElementById('browsersCompat');
+  var compatOk = document.getElementById('browsersCompatOk');
 
   var initial = null;       // JSON string of the state as loaded
   var lastPreview = null;   // the last successful dry run
@@ -182,6 +184,17 @@
     summary.textContent = state.cases.length + ' cases' +
       (failing ? ', ' + failing + ' failing' : ', all pass') +
       (changed ? ', ' + changed + ' changed' : '');
+
+    compatList.textContent = '';
+    data.stylesheets.forEach(function (w) {
+      var li = clone('browsersCompatTemplate');
+      q('[data-sheet]', li).textContent = w.theme + ' \u00b7 ' + w.sheet;
+      q('[data-feature]', li).textContent = w.feature;
+      q('[data-needs]', li).textContent = w.needs;
+      q('[data-served]', li).textContent = w.still_served;
+      compatList.appendChild(li);
+    });
+    compatOk.hidden = data.stylesheets.length > 0;
 
     tryResult.textContent = data.try
       ? 'Epoch ' + epochLabel(data.try.epoch, data.try.dashboard) + ' — ' + ruleName(state, data.try.rule)

@@ -45,6 +45,15 @@
   </section>
 
   <section class="boat-rudder-dashboard__panel">
+    <h2>Stylesheet check</h2>
+    <p class="boat-rudder-dashboard__hint">Every theme's epoch 3 stylesheets, public and admin, as
+       served (with their dashboard customizations), against the rules as you edit them: a feature
+       listed here would reach browsers that don't support it.</p>
+    <p class="boat-rudder-browsers__compat-ok" id="browsersCompatOk" hidden>Every stylesheet is within these rules.</p>
+    <ul class="boat-rudder-browsers__compat" id="browsersCompat"></ul>
+  </section>
+
+  <section class="boat-rudder-dashboard__panel">
     <div class="boat-rudder-dashboard__panel-header">
       <h2>Test cases</h2>
       <div class="boat-rudder-dashboard__panel-actions">
@@ -123,6 +132,11 @@
         </div>
       </details>
     </li>
+  </template>
+
+  <template id="browsersCompatTemplate">
+    <li><span class="boat-rudder-badge" data-sheet></span> <code data-feature></code> needs
+        <span data-needs></span> - still served to <strong data-served></strong>.</li>
   </template>
 
   <template id="browsersTierTemplate">
