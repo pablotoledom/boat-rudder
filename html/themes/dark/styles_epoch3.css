@@ -223,7 +223,7 @@ h3 {
   width: 80%;
   max-width: 980px;
   margin: 0 auto;
-  padding: 40px 20px;
+  padding: 24px 20px;
   min-height: 50vh;
   box-sizing: border-box;
   background-color: var(--br-color-page-content-background, transparent);

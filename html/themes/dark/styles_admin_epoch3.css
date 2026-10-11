@@ -1217,6 +1217,31 @@
   margin: 0;
 }
 
+
+.boat-rudder-dashboard__panel {
+  margin: 32px 0;
+}
+
+.boat-rudder-dashboard__panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #4a4a4a;
+}
+
+.boat-rudder-dashboard__panel-header h1,
+.boat-rudder-dashboard__panel-header h2 {
+  margin: 0;
+  border: none;
+}
+
+.boat-rudder-dashboard__panel .boat-rudder-analytics__totals {
+  margin-bottom: 12px;
+}
+
 /* Dashboard home (dashboard_epoch3.html): option groups, then panels - each
    a heading with its action buttons on the right ("Welcome back" + Log out,
    "Entries pending publication", the analytics summary). Maintainer lists
@@ -1228,7 +1253,8 @@
   margin: 16px 0 24px;
 }
 
-.boat-rudder-dashboard__options-title {
+.boat-rudder-dashboard__options-title,
+h2.boat-rudder-dashboard__options-title {
   margin: 0 0 10px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--br-admin-border);
@@ -1288,28 +1314,6 @@
   flex: 0 0 180px;
   background: transparent;
   border: none;
-}
-
-.boat-rudder-dashboard__panel {
-  margin: 0 0 32px;
-}
-
-.boat-rudder-dashboard__panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.boat-rudder-dashboard__panel-header h1,
-.boat-rudder-dashboard__panel-header h2 {
-  margin: 0;
-}
-
-.boat-rudder-dashboard__panel .boat-rudder-analytics__totals {
-  margin-bottom: 12px;
 }
 
 /* Lets a wide entries table scroll inside itself on a phone instead of
