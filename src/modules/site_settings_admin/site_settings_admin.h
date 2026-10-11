@@ -6,8 +6,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-// /dashboard/settings - the site name form, plus links to Themes and
-// Preview. `error_message` is shown above the form if non-NULL/non-empty.
+// /dashboard/settings - the site name form, the epoch 2 and epoch 3 favicons
+// (html/favicon2.ico / favicon3.ico, see page_layout.h), plus links to Themes,
+// Fonts and Preview. `error_message` is shown above the form if non-NULL/non-empty.
 // Returns a malloc'd string, or NULL on a missing template / allocation
 // failure.
 char *site_settings_general_page(int epoch, const char *site_name, const char *error_message);

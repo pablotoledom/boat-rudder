@@ -354,6 +354,15 @@ for customizing a theme; the themes list links it as *Customize*, and the old pe
 
 - `/dashboard/settings` edits `site_settings.site_name` (default `"Boat Rudder"`). Every
   `{{SITE_NAME}}` in titles and templates is replaced, HTML-escaped, by `page_layout_wrap()`.
+- The same page uploads the site's **favicons**, one per epoch that shows one: `favicon2.ico`
+  (epoch 2, must contain a 16x16 image - all IE5 and its peers read) and `favicon3.ico` (epoch 3,
+  any multi-size `.ico`), written to the static root (`html/`) through a temporary file. Each
+  must be a real ICO (header and every image entry checked, ≤ 256 KiB). When one exists,
+  `splice_favicon()` (`page_layout.c`) points the layout's favicon `<link>` at it with a
+  `?v=<mtime>` cache-buster - or adds a `<link>` when the layout has none - otherwise the theme's
+  own link stays, so the defaults (`/favicon.ico`, `/favicon-nb.ico`) live in the layouts, not in
+  C. *Use the theme's* deletes the upload. The page previews the icon each epoch uses now
+  (`page_layout_favicon_url()`).
 - `/dashboard/settings/preview` shows the public site in an iframe with an epoch picker and
   screen-size presets. It works because every route honors `?preview_epoch=N`
   (`resolve_epoch()`); the page's script re-appends the parameter to each same-origin link after
@@ -402,7 +411,7 @@ All settings routes are epoch 3 and **admin only**.
 | `src/modules/site_settings_admin/` | All `/dashboard/settings*` pages, the theme customizer |
 | `src/modules/theme_page/` | Public `/theme` page |
 | `src/modules/menu/menu.c` | Navbar logo and theme selector |
-| `src/html_builder/page_layout.c` | Color, font, footer logo, home blog (epoch 3) and site-name splicing |
+| `src/html_builder/page_layout.c` | Color, font, footer logo, home blog (epoch 3), favicon and site-name splicing |
 | `src/modules/blog_list/blog_list.c` | Home blog backgrounds on epoch 2 (`set_table_background()`) |
 | `src/utils/image_convert/`, `src/utils/wbmp_writer.c` | WBMP conversion |
 | `html/templates/dashboard/settings/` | Admin templates |

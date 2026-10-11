@@ -1,5 +1,6 @@
 #include "site_settings_admin.h"
 #include "../../db/cms_fonts.h"
+#include "../../html_builder/page_layout.h"
 #include "../../utils/generate_url_theme.h"
 #include "../../utils/http_utils.h"
 #include "../../utils/read_file.h"
@@ -25,12 +26,53 @@ static char *html_encode_alloc(const char *src) {
     return out;
 }
 
+// The two favicon panels of /dashboard/settings: epoch 2 (16x16) and epoch 3
+// (multi-size), each previewing the icon its pages use now - the uploaded
+// one, else the theme's own - with an upload form and, for an uploaded one,
+// "Use the theme's". Returns a malloc'd string, or NULL on a missing
+// template / allocation failure.
+static char *favicon_panels(int epoch) {
+    char *panel_tpl = load_template("dashboard/settings/settings-favicon-panel_epoch%d.html", epoch);
+    if (!panel_tpl) return NULL;
+
+    static const struct { int epoch; const char *title, *hint; } FAVICONS[] = {
+        { EPOCH_MIDDLE, "Epoch 2 favicon",
+          "A 16x16 .ico - the only size Internet Explorer 5 and its peers read." },
+        { EPOCH_MODERN, "Epoch 3 favicon",
+          "A multi-size .ico (16, 32, 48 px...) for modern browsers, tabs and bookmarks." },
+    };
+
+    char *panels = strdup("");
+    for (size_t i = 0; panels && i < sizeof(FAVICONS) / sizeof(FAVICONS[0]); i++) {
+        int is_custom = 0;
+        char *url = page_layout_favicon_url(FAVICONS[i].epoch, &is_custom);
+        char *encoded = html_encode_alloc(url ? url : "");
+        char epoch_str[4];
+        snprintf(epoch_str, sizeof(epoch_str), "%d", FAVICONS[i].epoch);
+
+        char *panel = encoded
+            ? render_template(panel_tpl, epoch_str, FAVICONS[i].title, FAVICONS[i].hint,
+                              encoded, url ? "" : " hidden",
+                              is_custom ? "Uploaded" : (url ? "The theme's own" : "None"),
+                              is_custom ? "" : " hidden")
+            : NULL;
+        free(url);
+        free(encoded);
+        panels = panel ? str_append(panels, panel) : (free(panels), NULL);
+        free(panel);
+    }
+
+    free(panel_tpl);
+    return panels;
+}
+
 char *site_settings_general_page(int epoch, const char *site_name, const char *error_message) {
     char *page_tpl  = load_template("dashboard/settings/settings_epoch%d.html", epoch);
     char *error_tpl = load_template("dashboard/settings/settings-error_epoch%d.html", epoch);
 
     char *error_html = NULL;
     char *encoded_name = NULL;
+    char *favicons = NULL;
     char *result = NULL;
 
     if (!page_tpl) goto cleanup;
@@ -39,15 +81,17 @@ char *site_settings_general_page(int epoch, const char *site_name, const char *e
         error_html = render_template(error_tpl, error_message);
 
     encoded_name = html_encode_alloc(site_name ? site_name : "");
-    if (!encoded_name) goto cleanup;
+    favicons = favicon_panels(epoch);
+    if (!encoded_name || !favicons) goto cleanup;
 
-    result = render_template(page_tpl, error_html ? error_html : "", encoded_name);
+    result = render_template(page_tpl, error_html ? error_html : "", encoded_name, favicons);
 
 cleanup:
     free(page_tpl);
     free(error_tpl);
     free(error_html);
     free(encoded_name);
+    free(favicons);
     return result;
 }
 

@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 // Replaces `marker` with the contents of layout/<part>_epoch<N>.html. A part
 // that has no file for this epoch resolves to nothing, which is how the retro
@@ -445,6 +446,107 @@ static char *splice_admin_styles(char *html, int epoch) {
     return result;
 }
 
+// ---- Favicons ----------------------------------------------------------------
+//
+// The site's own favicons, uploaded from /dashboard/settings - favicon2.ico
+// for epoch 2, favicon3.ico for epoch 3, in the static root. When one exists
+// it takes over the href of the layout's favicon <link> (or a <link> is added
+// when the layout has none); otherwise the theme's own link is left as it is,
+// so the defaults stay in the layouts, not here.
+
+int page_layout_favicon_path(int epoch, char *out, size_t out_size) {
+    if (epoch != EPOCH_MIDDLE && epoch != EPOCH_MODERN) return 0;
+    int n = snprintf(out, out_size, "./html/favicon%d.ico", epoch);
+    return n > 0 && (size_t)n < out_size;
+}
+
+// "/favicon<N>.ico?v=<mtime>" when the uploaded file exists - the version
+// makes browsers, which cache favicons hard, fetch a replaced one.
+static int favicon_custom_url(int epoch, char *out, size_t out_size) {
+    char path[64];
+    struct stat st;
+    if (!page_layout_favicon_path(epoch, path, sizeof(path)) ||
+        stat(path, &st) != 0 || !S_ISREG(st.st_mode))
+        return 0;
+    int n = snprintf(out, out_size, "/favicon%d.ico?v=%lld", epoch, (long long)st.st_mtime);
+    return n > 0 && (size_t)n < out_size;
+}
+
+// The href value of the first <link rel="icon"> / <link rel="shortcut icon">
+// in `html`'s <head>: returns its start and sets *value_end to its closing
+// quote, or returns NULL.
+static char *find_favicon_href(char *html, char **value_end) {
+    char *head_end = strstr(html, "</head>");
+    for (char *link = strstr(html, "<link"); link && (!head_end || link < head_end);
+         link = strstr(link + 5, "<link")) {
+        char *tag_end = strchr(link, '>');
+        if (!tag_end) return NULL;
+
+        size_t len = (size_t)(tag_end - link);
+        char tag[512];
+        if (len >= sizeof(tag)) continue;
+        memcpy(tag, link, len);
+        tag[len] = '\0';
+        if (!strstr(tag, "rel=\"icon\"") && !strstr(tag, "rel=\"shortcut icon\"")) continue;
+
+        char *href = strstr(tag, "href=\"");
+        if (!href) continue;
+        char *value = link + (href - tag) + 6;
+        char *end = strchr(value, '"');
+        if (!end || end > tag_end) continue;
+        *value_end = end;
+        return value;
+    }
+    return NULL;
+}
+
+static char *splice_favicon(char *html, int epoch) {
+    char url[64];
+    if (!html || !favicon_custom_url(epoch, url, sizeof(url))) return html;
+
+    char *end = NULL;
+    char *value = find_favicon_href(html, &end);
+    char *result = NULL;
+    if (value) {
+        size_t head = (size_t)(value - html), url_len = strlen(url), tail = strlen(end);
+        result = malloc(head + url_len + tail + 1);
+        if (result) {
+            memcpy(result, html, head);
+            memcpy(result + head, url, url_len);
+            memcpy(result + head + url_len, end, tail + 1);
+        }
+    } else if (strstr(html, "</head>")) {
+        char tag[128];
+        snprintf(tag, sizeof(tag), "<link rel=\"%s\" href=\"%s\">\n</head>",
+                 epoch == EPOCH_MIDDLE ? "shortcut icon" : "icon", url);
+        result = str_replace_first(html, "</head>", tag);
+    } else {
+        return html;
+    }
+    free(html);
+    return result;
+}
+
+char *page_layout_favicon_url(int epoch, int *is_custom) {
+    char url[64];
+    if (is_custom) *is_custom = 0;
+    if (favicon_custom_url(epoch, url, sizeof(url))) {
+        if (is_custom) *is_custom = 1;
+        return strdup(url);
+    }
+
+    char *path = generate_url_theme("layout/layout_epoch%d.html", epoch);
+    char *layout = path ? read_file_to_string(path) : NULL;
+    free(path);
+    if (!layout) return NULL;
+
+    char *end = NULL;
+    char *value = find_favicon_href(layout, &end);
+    char *result = value ? strndup(value, (size_t)(end - value)) : NULL;
+    free(layout);
+    return result;
+}
+
 char *page_layout_wrap(char *fragment_html, const char *page_title, int epoch,
                        const char *body_background) {
     if (!fragment_html) return NULL;
@@ -507,6 +609,7 @@ char *page_layout_wrap(char *fragment_html, const char *page_title, int epoch,
 
     with_colors = splice_admin_styles(with_colors, epoch);
     if (with_colors) with_colors = splice_csrf_token(with_colors, epoch);
+    if (with_colors) with_colors = splice_favicon(with_colors, epoch);
     if (!with_colors) {
         free(fragment_html);
         return NULL;

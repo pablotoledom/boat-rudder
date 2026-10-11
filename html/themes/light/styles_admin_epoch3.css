@@ -996,6 +996,131 @@
   width: 100%;
 }
 
+/* Site settings (settings_epoch3.html): the site name form, a field and its
+   Save button side by side, and "More settings" as a grid of link cards. */
+.boat-rudder-dashboard__hint {
+  margin: 0;
+  font-size: var(--br-admin-font-sm);
+  color: var(--br-admin-text-muted);
+}
+
+.boat-rudder-dashboard__site-name {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 640px;
+}
+
+.boat-rudder-dashboard__site-name label {
+  font-weight: 600;
+}
+
+.boat-rudder-dashboard__site-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.boat-rudder-dashboard__site-name-row .boat-rudder-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.boat-rudder-dashboard__links {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.boat-rudder-dashboard__link-card,
+.boat-rudder-dashboard__link-card:is(:link, :visited) {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--br-admin-pad-card);
+  color: var(--br-admin-text);
+  text-decoration: none;
+  background: var(--br-admin-surface);
+  border: 1px solid var(--br-admin-border);
+  border-radius: var(--br-admin-radius);
+}
+
+.boat-rudder-dashboard__link-card strong::after {
+  content: " \2192";
+  color: var(--br-admin-text-muted);
+}
+
+.boat-rudder-dashboard__link-card span {
+  font-size: var(--br-admin-font-sm);
+  color: var(--br-admin-text-muted);
+}
+
+.boat-rudder-dashboard__link-card:hover,
+.boat-rudder-dashboard__link-card:focus-visible {
+  border-color: var(--br-admin-accent);
+}
+
+.boat-rudder-dashboard__link-card:hover strong,
+.boat-rudder-dashboard__link-card:hover strong::after {
+  color: var(--br-admin-accent);
+}
+
+/* Site settings: the epoch 2 and epoch 3 favicons, side by side - preview
+   (pixelated, so a 16x16 icon shows its real pixels), name, status, upload. */
+.boat-rudder-dashboard__favicons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.boat-rudder-dashboard__favicon {
+  display: flex;
+  flex: 1 1 320px;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 480px;
+}
+
+.boat-rudder-dashboard__favicon-preview {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: repeating-conic-gradient(var(--br-admin-surface-raised) 0% 25%, var(--br-admin-surface) 0% 50%) 0 0 / 8px 8px;
+  border: 1px solid var(--br-admin-border);
+  border-radius: var(--br-admin-radius);
+}
+
+.boat-rudder-dashboard__favicon-preview img {
+  image-rendering: pixelated;
+}
+
+.boat-rudder-dashboard__favicon-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.boat-rudder-dashboard__favicon-status {
+  font-size: var(--br-admin-font-sm);
+  font-weight: 600;
+  color: var(--br-admin-accent);
+}
+
+.boat-rudder-dashboard__favicon-hint {
+  margin: 0;
+  font-size: var(--br-admin-font-sm);
+  color: var(--br-admin-text-muted);
+}
+
+.boat-rudder-dashboard__favicon-intro {
+  margin-bottom: 10px;
+}
+
 /* A single-image field (logo, home blog background): its label, the current
    file as a one-row file list, and the upload button below. */
 .boat-rudder-dashboard__asset-field {

@@ -12,6 +12,15 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *A
 ## v0.0.1
 
 ### 2026-10-08 … 2026-10-09
+### Site favicons
+
+**Added**
+- `/dashboard/settings` uploads the site's favicons under the site name: one for epoch 2
+  (`favicon2.ico`, must contain a 16x16 image) and one for epoch 3 (`favicon3.ico`, multi-size),
+  saved in the site root. Pages then link them with a cache-buster; without them each epoch keeps
+  its theme's own favicon. The page previews the current icon of each epoch, and *Use the
+  theme's* removes an upload.
+
 ### Theme customizer
 
 **Added**

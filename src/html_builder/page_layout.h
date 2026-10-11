@@ -1,6 +1,8 @@
 #ifndef PAGE_LAYOUT_H
 #define PAGE_LAYOUT_H
 
+#include <stddef.h>
+
 // Assembles a finished page out of the parts each page type needs.
 //
 // A page is built in two stages with two different mechanisms, and the split
@@ -28,5 +30,19 @@
 // Takes ownership of `fragment_html` and frees it. Returns NULL on failure.
 char *page_layout_wrap(char *fragment_html, const char *page_title, int epoch,
                        const char *body_background);
+
+// The site's uploaded favicons (/dashboard/settings): epoch 2 and 3 each have
+// one file in the static root. page_layout_wrap() points the layout's favicon
+// <link> at it when it exists (with a ?v=<mtime> cache-buster), and leaves the
+// theme's own link alone otherwise.
+//
+// page_layout_favicon_path() writes "./html/favicon<N>.ico" for epoch 2/3 and
+// returns 1, or returns 0 for any other epoch.
+int page_layout_favicon_path(int epoch, char *out, size_t out_size);
+
+// The favicon URL an epoch's pages use - the uploaded file's, else the href
+// of the active theme's layout <link> - as a malloc'd string, NULL if there
+// is none. *is_custom (if non-NULL) says whether it is the uploaded one.
+char *page_layout_favicon_url(int epoch, int *is_custom);
 
 #endif // PAGE_LAYOUT_H

@@ -132,7 +132,9 @@ All **E3, A**. Detailed behavior in [themes.md](themes.md) and [fonts.md](fonts.
 
 | Method | Path | Handler | Notes |
 |---|---|---|---|
-| `GET`/`POST` | `/dashboard/settings` | `site_settings_general_page()` / `cms_update_site_name()` | Field `site_name` |
+| `GET`/`POST` | `/dashboard/settings` | `site_settings_general_page()` / `cms_update_site_name()` | Field `site_name`; GET query `error` (`favicon-type`, `favicon-16`, `favicon-size`, `favicon-write`) shows a favicon upload error |
+| `POST` | `/dashboard/settings/favicon` | `favicon_ico_problem()` + write to `html/favicon<N>.ico` | Multipart `epoch` (`2`/`3`), `file` (`.ico`, ≤ 256 KiB; epoch 2 needs a 16x16 image); `302` to `/dashboard/settings`, with `?error=` on a rejected file |
+| `POST` | `/dashboard/settings/favicon/delete` | `unlink()` | Field `epoch`: back to the theme's own favicon; `302` to `/dashboard/settings` |
 | `GET` | `/dashboard/settings/themes` | `site_settings_themes_page()` | List of the directories under `html/themes/`: name, *Active* or *Set active*, *Customize* |
 | `GET` | `/dashboard/settings/themes/<key>/customize` | `site_settings_customize_page()` | The theme customizer: per-epoch panels, live preview, CSS drawer ([themes.md](themes.md#81-theme-customizer)). Guard: Theme |
 | `GET` | `/dashboard/settings/themes/<key>` | - | `302` to `…/<key>/customize` (to the list for an unknown key) |

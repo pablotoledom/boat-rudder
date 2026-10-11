@@ -20,6 +20,7 @@
 #include "../db/session_manager.h"
 #include "../db/short_links.h"
 #include "../html_builder/orchestrator.h"
+#include "../html_builder/page_layout.h"
 #include "../modules/analytics/analytics.h"
 #include "../modules/analytics_view/analytics_view.h"
 #include "../modules/blog_list/blog_list.h"
@@ -801,6 +802,35 @@ static int wap_twin_name(const char *name, const char *ext, char *out, size_t ou
     return n > 0 && (size_t)n < out_size;
 }
 
+// The site favicons uploaded from /dashboard/settings (see page_layout.h's
+// page_layout_favicon_path()): a real .ico, at most FAVICON_MAX_BYTES, and
+// for epoch 2 - whose browsers read only the 16x16 image - one that has a
+// 16x16 entry. Checks the ICONDIR header and that every entry's image lies
+// inside the file. Returns NULL when `data` is acceptable, else the error
+// code /dashboard/settings shows a message for.
+#define FAVICON_MAX_BYTES (256 * 1024)
+
+static const char *favicon_ico_problem(const unsigned char *data, size_t len, int epoch) {
+    if (len == 0) return "favicon-type";
+    if (len > FAVICON_MAX_BYTES) return "favicon-size";
+    if (len < 6 || data[0] != 0 || data[1] != 0 || data[2] != 1 || data[3] != 0)
+        return "favicon-type";
+
+    size_t count = (size_t)data[4] | ((size_t)data[5] << 8);
+    if (count == 0 || 6 + 16 * count > len) return "favicon-type";
+
+    int has_16 = 0;
+    for (size_t i = 0; i < count; i++) {
+        const unsigned char *e = data + 6 + 16 * i;
+        size_t size = (size_t)e[8] | ((size_t)e[9] << 8) | ((size_t)e[10] << 16) | ((size_t)e[11] << 24);
+        size_t off  = (size_t)e[12] | ((size_t)e[13] << 8) | ((size_t)e[14] << 16) | ((size_t)e[15] << 24);
+        if (size == 0 || off > len || size > len - off) return "favicon-type";
+        if (e[0] == 16 && e[1] == 16) has_16 = 1;
+    }
+    if (epoch == EPOCH_MIDDLE && !has_16) return "favicon-16";
+    return NULL;
+}
+
 // Builds {"files":["name1","name2",...]} for the banner/footer editor's
 // asset browser. Returns a malloc'd string, always valid JSON (an invalid
 // component/epoch or an unreadable directory yields an empty list, not an
@@ -1250,9 +1280,9 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             const char *real_ip  = get_header_value(&req, "X-Real-IP");
             const char *fwd      = get_header_value(&req, "X-Forwarded-For");
             if (real_ip && real_ip[0]) {
-                strncpy(client_ip, real_ip, sizeof(client_ip) - 1);
+                snprintf(client_ip, sizeof(client_ip), "%s", real_ip);
             } else if (fwd && fwd[0]) {
-                strncpy(client_ip, fwd, sizeof(client_ip) - 1);
+                snprintf(client_ip, sizeof(client_ip), "%s", fwd);
                 char *comma = strchr(client_ip, ',');
                 if (comma) *comma = '\0';
                 // trim leading space
@@ -1260,12 +1290,11 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                 while (*p == ' ') p++;
                 if (p != client_ip) memmove(client_ip, p, strlen(p) + 1);
             } else {
-                strncpy(client_ip, peer_ip, sizeof(client_ip) - 1);
+                snprintf(client_ip, sizeof(client_ip), "%s", peer_ip);
             }
         } else {
-            strncpy(client_ip, peer_ip, sizeof(client_ip) - 1);
+            snprintf(client_ip, sizeof(client_ip), "%s", peer_ip);
         }
-        client_ip[sizeof(client_ip) - 1] = '\0';
     }
 
     {
@@ -1571,8 +1600,20 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                 } else {
                     char user_id[USER_ID_HEX_BUF_SIZE];
                     if (require_admin_session(ctx, &req, epoch, user_id)) {
+                        // ?error=<code> after a failed favicon upload.
+                        static const struct { const char *code, *message; } ERRORS[] = {
+                            { "favicon-type",  "The favicon must be an .ico file." },
+                            { "favicon-16",    "The epoch 2 favicon must contain a 16x16 image." },
+                            { "favicon-size",  "The favicon must be at most 256 KiB." },
+                            { "favicon-write", "Could not save the favicon." },
+                        };
+                        const char *error_code = get_query_param(params, param_count, "error");
+                        const char *error_message = NULL;
+                        for (size_t i = 0; error_code && i < sizeof(ERRORS) / sizeof(ERRORS[0]); i++)
+                            if (strcmp(error_code, ERRORS[i].code) == 0) error_message = ERRORS[i].message;
+
                         char *name     = cms_get_site_name();
-                        char *content  = site_settings_general_page(epoch, name, NULL);
+                        char *content  = site_settings_general_page(epoch, name, error_message);
                         free(name);
                         char *body     = buildPageWebSite(epoch, "{{SITE_NAME}} - Dashboard", content);
                         char *response = body ? build_epoch_response(body, "", epoch) : NULL;
@@ -3323,6 +3364,67 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
 
                     cms_entry_edit_free(&entry, lang_count);
                     cms_languages_free(langs, lang_count);
+                }
+            }
+
+        } else if (strcmp(req.method, "POST") == 0 &&
+                   (strcmp(decoded_url, "/dashboard/settings/favicon") == 0 ||
+                    strcmp(decoded_url, "/dashboard/settings/favicon/delete") == 0)) {
+            // The site favicons: multipart `epoch` (2/3) + `file` (.ico)
+            // uploads one, written to a temporary name and renamed over the
+            // old so a request never sees half a file; .../delete (field
+            // `epoch`) removes it, back to the theme's own <link>.
+            int epoch = resolve_epoch(&req);
+
+            if (epoch != EPOCH_MODERN) {
+                char *response = build_redirect_response("/dashboard", "", epoch);
+                send_or_error(ctx, response, req.method, epoch);
+            } else {
+                char user_id[USER_ID_HEX_BUF_SIZE];
+                if (require_admin_session(ctx, &req, epoch, user_id)) {
+                    int is_delete = strcmp(decoded_url, "/dashboard/settings/favicon/delete") == 0;
+                    const char *error = NULL;
+                    char path[64];
+
+                    if (is_delete) {
+                        char target[4] = "";
+                        parse_urlencoded_field(req.body, req.body_length, "epoch", target, sizeof(target));
+                        if (page_layout_favicon_path(atoi(target), path, sizeof(path))) unlink(path);
+                    } else {
+                        const char *ct = get_header_value(&req, "Content-Type");
+                        MultipartResult *mp = parse_multipart(req.body, req.body_length, ct);
+                        const MultipartPart *epoch_part = mp ? multipart_find(mp, "epoch") : NULL;
+                        const MultipartPart *file_part = mp ? multipart_find(mp, "file") : NULL;
+
+                        int target = epoch_part && epoch_part->data_len == 1 ? epoch_part->data[0] - '0' : -9;
+                        if (!file_part || !page_layout_favicon_path(target, path, sizeof(path))) {
+                            error = "favicon-type";
+                        } else {
+                            error = favicon_ico_problem((const unsigned char *)file_part->data,
+                                                        file_part->data_len, target);
+                        }
+
+                        if (!error) {
+                            char tmp[80];
+                            snprintf(tmp, sizeof(tmp), "%s.tmp", path);
+                            FILE *f = fopen(tmp, "wb");
+                            int ok = f && fwrite(file_part->data, 1, file_part->data_len, f) == file_part->data_len;
+                            if (f && fclose(f) != 0) ok = 0;
+                            if (ok && rename(tmp, path) == 0) {
+                                LOG_INFO("Favicon saved: %s", path);
+                            } else {
+                                unlink(tmp);
+                                error = "favicon-write";
+                            }
+                        }
+                        free_multipart(mp);
+                    }
+
+                    char target_url[96];
+                    snprintf(target_url, sizeof(target_url), "/dashboard/settings%s%s",
+                             error ? "?error=" : "", error ? error : "");
+                    char *response = build_redirect_response(target_url, "", epoch);
+                    send_or_error(ctx, response, req.method, epoch);
                 }
             }
 

@@ -670,8 +670,10 @@ static char *build_epoch_donut(const AnalyticsData *week) {
 // build_compare_table().
 static char *build_summary_hbars(const KVList *week, const KVList *today, int limit,
                                   const char *href_fmt, const char *aria_label) {
+    // Never more rows than the arrays below hold, whatever `limit` asks for.
     int n = week->count < limit ? week->count : limit;
-    if (n == 0) return analytics_chart_hbars(NULL, 0, aria_label);
+    if (n > SUMMARY_TOP_N) n = SUMMARY_TOP_N;
+    if (n <= 0) return analytics_chart_hbars(NULL, 0, aria_label);
 
     ChartBar bars[SUMMARY_TOP_N];
     char details[SUMMARY_TOP_N][32];
