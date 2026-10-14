@@ -257,7 +257,7 @@ static char *render_byline(const CmsContentBlock *block, int epoch) {
 static char *image_for_epoch(const char *url, int epoch) {
     if (!url || !url[0]) return strdup("");
 
-    // Epoch 1 (Mosaic, Netscape 1-3, IE<=4) gets `_micro` (max 180px)
+    // Epoch 1 (Mosaic, Netscape 1-2, IE<=3) gets `_micro` (max 180px)
     // instead of epoch 2's `_medium` (max 600px) - real epoch-1 browsers
     // predate broadband as much as they predate CSS, so the same
     // "lighter file for an older client" reasoning that already gives them

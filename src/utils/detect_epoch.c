@@ -56,9 +56,12 @@ static const FactoryRule FACTORY_RULES[] = {
       TOKENS("AppleWebKit", "UP.Browser/3", "UP/3"), "", { { "", 0, false } }, 0, EPOCH_WML, false },
 
     // Text-mode browsers. Cello is a 1993 graphical browser that is text-only
-    // in practice; its pre-Unicode charset is handled by request_charset.c.
+    // in practice; its pre-Unicode charset is handled by request_charset.c,
+    // as is the CERN Line Mode Browser's, whose real UA is "LineMode/2.15
+    // libwww/2.17" (or "W3CLineMode/5.4.0"). Its HTTP/0.9 versions send no
+    // User-Agent at all - the router sends those to epoch 0 itself.
     { "Text browsers",
-      TOKENS("Lynx", "Cello", "Line Mode Browser", "ELinks", "w3m"),
+      TOKENS("Lynx", "Cello", "Line Mode Browser", "LineMode", "ELinks", "w3m"),
       NO_TOKENS, "", { { "", 0, false } }, 0, EPOCH_PRESTANDARD, false },
 
     // MSIE 4+ has CSS1, a:hover and JavaScript - all of epoch 2. Opera 5-9
@@ -148,6 +151,8 @@ static const FactoryCase FACTORY_CASES[] = {
 
     { "Lynx", "Lynx/2.9.0dev.12 libwww-FM/2.14 SSL-MM/1.4.1 GNUTLS/3.7.8", EPOCH_PRESTANDARD, false },
     { "w3m", "w3m/0.5.3+git20230121", EPOCH_PRESTANDARD, false },
+    { "CERN Line Mode Browser 2.15", "LineMode/2.15 libwww/2.17b3", EPOCH_PRESTANDARD, false },
+    { "W3C Line Mode Browser 5.4", "W3CLineMode/5.4.0 libwww/5.4.0", EPOCH_PRESTANDARD, false },
     { "ELinks", "ELinks/0.13.2 (textmode; Linux 6.1.0 x86_64; 80x24-2)", EPOCH_PRESTANDARD, false },
 
     { "NCSA Mosaic 2.1", "NCSA_Mosaic/2.1 (Windows x86)", EPOCH_EARLY, false },

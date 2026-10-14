@@ -2,7 +2,7 @@
 
 A file manager and image library for the CMS. Admins and authors can upload images, organize
 them into directories, move and delete them, and select them from the entry editor. All routes
-are epoch 3 only and require a valid session cookie (`require_dashboard_session()`) - any role;
+are epoch 3 only (with the rules' dashboard flag, `dashboard_allowed()`) and require a valid session cookie (`require_dashboard_session()`) - any role;
 there is no per-item ownership check (see [security.md](security.md#known-gaps)). Collection
 schemas are summarized in [data-model.md](data-model.md#media).
 
@@ -233,7 +233,7 @@ A public, epoch-aware standalone page (not wrapped by `buildPageWebSite()`):
   link as text. The QR encodes `/qr/<code>`, a short link to `/gallery/<id>` (made absolute with
   `public_url`, or the request's `Host`), because the full gallery URL made the QR too dense to
   fit a text browser's row. WML gets a WBMP image (`html/content/qr/gallery-<id>.wbmp`); epoch 0
-  gets Unicode half-block text, or Latin-1 block glyphs for Cello. See
+  gets Unicode half-block text, or Latin-1 block glyphs for its pre-Unicode readers (Cello, Line Mode, HTTP/0.9). See
   [qr-and-short-links.md](qr-and-short-links.md).
 
 Every epoch's page has a "Back to <entry title>" link to the entry the gallery belongs to

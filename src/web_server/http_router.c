@@ -357,6 +357,14 @@ static void send_simple(void *ctx, const char *status, const char *body) {
 // straight off req->url (rather than requiring every call site to have
 // already parsed the query string into params[]) is what lets one change
 // here cover every route.
+// A request with no HTTP version and no headers at all: the HTTP/0.9
+// "simple request" of a 1990-92 browser. (Cello sends version-less requests
+// too, but its page requests carry headers - it is classified by its
+// User-Agent like any other.)
+static int is_http09_request(const HttpRequest *req) {
+    return req->protocol[0] == '\0' && req->header_count == 0;
+}
+
 static int resolve_epoch(HttpRequest *req) {
     if (force_epoch >= EPOCH_WML && force_epoch <= EPOCH_MODERN) return force_epoch;
 
@@ -366,6 +374,9 @@ static int resolve_epoch(HttpRequest *req) {
         int preview_epoch = atoi(p + sizeof(preview_key) - 1);
         if (preview_epoch >= EPOCH_WML && preview_epoch <= EPOCH_MODERN) return preview_epoch;
     }
+
+    // No User-Agent to classify, and a browser older than tables: text.
+    if (is_http09_request(req)) return EPOCH_PRESTANDARD;
 
     return detect_epoch(get_header_value(req, "User-Agent"));
 }
@@ -1266,6 +1277,13 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
 
     LOG_INFO("%s %s %s", req.method, req.url, req.protocol);
 
+    // A genuine HTTP/0.9 client (WorldWideWeb, the early Line Mode Browser,
+    // ViolaWWW, Erwise): no version and, per its spec, no headers - so no
+    // User-Agent either. It expects the document alone, no status line or
+    // headers, which it would show as the start of the page. Static files
+    // turn this back off below (Cello). See is_http09_request().
+    ((connection_ctx_t *)ctx)->simple_response = is_http09_request(&req);
+
     // --- Determine real client IP ---
     // Honor X-Real-IP / X-Forwarded-For only from trusted reverse proxies.
     char client_ip[INET6_ADDRSTRLEN] = "unknown";
@@ -1339,7 +1357,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
         // this resolves what the *real* visiting browser can decode, off
         // its actual User-Agent regardless of any override - see
         // utils/request_charset.h.
-        request_charset_set(get_header_value(&req, "User-Agent"));
+        request_charset_set(get_header_value(&req, "User-Agent"), is_http09_request(&req));
         request_code_lines_set(get_query_param(params, param_count, "code_lines"));
         request_wml_set(req.url, get_query_param(params, param_count, "wml_pages"));
         char content_lang[16];
@@ -2755,6 +2773,10 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                 }
 
             } else {
+                // Files keep their status line and headers even for a
+                // version-less request: Cello 1.x fetches images that way
+                // and needs Content-Type to show them (static_file_server.c).
+                ((connection_ctx_t *)ctx)->simple_response = 0;
                 const char *ims = get_header_value(&req, "If-Modified-Since");
                 int status = serve_static_file(ctx, root_directory, decoded_url, ims);
                 if (status != 0) {

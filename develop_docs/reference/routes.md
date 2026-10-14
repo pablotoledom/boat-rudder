@@ -30,7 +30,7 @@ traffic is not routed here directly - it re-enters this table over loopback HTTP
 | Guard | Meaning | On failure |
 |---|---|---|
 | - | Public | - |
-| **E3** | `resolve_epoch() == 3` | Page routes: `302 /dashboard`. API routes (`/dashboard/api/*`): `403 Forbidden` (plain text). |
+| **E3** | `dashboard_allowed()`: `resolve_epoch() == 3` **and** the browser detection rules grant the real `User-Agent` the dashboard (factory: Chrome 111, Firefox 121, Safari 16.2) | Page routes: `302 /dashboard`. API routes (`/dashboard/api/*`): `403 Forbidden` (plain text). |
 | **S** | `require_dashboard_session()`: valid `session` cookie; on `POST` also the session's CSRF token (`X-CSRF-Token` header or `csrf_token` field - see [security.md](security.md#csrf-protection)) | `503` if MongoDB is down, `302 /login` without a session, `403` (plain text) for a missing/wrong CSRF token |
 | **S+R** | `require_dashboard_session_role()`: session, role loaded (missing role = `admin`) | as **S** |
 | **A** | `require_admin_session()`: session with role `admin` | as **S**, plus `302 /dashboard` for an `author` |
@@ -39,7 +39,8 @@ traffic is not routed here directly - it re-enters this table over loopback HTTP
 | **Theme** | `theme_key_is_valid(<key>)`: `html/themes/<key>/` exists | `404` |
 
 `resolve_epoch()` returns `force_epoch` if configured, else a valid `?preview_epoch=N`
-anywhere in the query string, else `detect_epoch(User-Agent)`. Because `preview_epoch` is
+anywhere in the query string, else 0 for a genuine HTTP/0.9 request, else
+`detect_epoch(User-Agent)` - the browser detection rules ([epochs.md](epochs.md)). Because `preview_epoch` is
 honored on every route, the dashboard preview iframe can browse the whole site in any epoch.
 
 ---

@@ -69,7 +69,7 @@ ImageMagick.
 | `generate_youtube_qr_wbmp(url, html_root)` | WBMP at `html/content/qr/youtube-<id>.wbmp` | WML video blocks |
 | `generate_qr_wbmp(text, fs_path)` | WBMP at any path (gallery: `html/content/qr/gallery-<id>.wbmp`) | WML gallery page |
 | `generate_qr_halfblock_text(text)` | `<pre>` of Unicode half-blocks (`▀ ▄ █`), two QR rows per text row so it comes out square | Epoch 0 in a UTF-8 terminal |
-| `generate_qr_asciiblock_text(text)` | Same layout using Latin-1 `Û Ü ß`, which `utf8_to_latin1()` turns into bytes `0xDB/0xDC/0xDF` - block glyphs in the CP437 "Terminal" font | Epoch 0 when `request_needs_legacy_charset()` (Cello) |
+| `generate_qr_asciiblock_text(text)` | Same layout using Latin-1 `Û Ü ß`, which `utf8_to_latin1()` turns into bytes `0xDB/0xDC/0xDF` - block glyphs in the CP437 "Terminal" font | Epoch 0 when `request_needs_legacy_charset()` (Cello, Line Mode, HTTP/0.9) |
 
 - The choice between the two text forms follows the **real** browser (`request_charset`), not
   the rendered epoch, so previewing epoch 0 from a modern browser shows the Unicode form.

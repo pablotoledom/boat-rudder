@@ -28,6 +28,8 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *A
   `?preview_epoch=3` can't lift an older browser in; other epoch 3 browsers see "needs a more
   recent browser".
 - `tests/browser_detection_bson_test.c` (rules to/from BSON and the page's JSON).
+- `develop_docs/reference/epochs.md`: each epoch's technical specification - protocol, encoding,
+  markup, CSS and JS level, full-fidelity floor, the browsers sent to it - and what keeps it true.
 - CSS compatibility check (`src/utils/css_compat.c`): ~20 CSS features with their first Chrome,
   Firefox and Safari versions (`:has()`, `color-mix()`, container queries, nesting, `dvh`, ...)
   checked against the detection rules by classifying the version just below each - so it works
@@ -37,6 +39,13 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *A
   factory floors.
 
 **Changed**
+- Genuine HTTP/0.9 clients (a version-less request with no headers: WorldWideWeb, the early Line
+  Mode Browser, ViolaWWW) get pages as an RFC 1945 Simple-Response - no status line or headers,
+  which they would print as the top of the page - in epoch 0 and Latin-1, instead of epoch 1 with
+  HTTP/1.1 headers. Static files keep their headers (Cello's version-less image fetches need
+  Content-Type).
+- The CERN Line Mode Browser is recognized by its real User-Agent (`LineMode/2.15 libwww/2.17`,
+  `W3CLineMode/5.4.0`), not only "Line Mode Browser": epoch 0 in Latin-1, was epoch 1.
 - UP.Browser 3.x (HDML only, never WML) is no longer sent WML: excluded from the WAP rule.
 - `styles_epoch3.css`: `-webkit-user-select` next to `user-select`, so code line numbers stay
   out of a copy on Safari too.

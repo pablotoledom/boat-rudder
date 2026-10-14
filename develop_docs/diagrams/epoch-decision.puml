@@ -16,18 +16,24 @@ if (?preview_epoch=N in the query, N in -1..3?) then (yes)
   stop
 endif
 
-:Read "User-Agent" header;
+if (HTTP/0.9 request (no version, no headers)?) then (yes)
+  #FFF3E0:epoch = 0 (EPOCH_PRESTANDARD);
+  :Simple-Response: the document alone,\nno status line or headers; Latin-1 body;
+  stop
+endif
 
-if (WAP tokens present AND "AppleWebKit" absent?) then (yes)
+:Read "User-Agent" header;\nclassify by the browser detection rules\n(factory rules below, editable in the dashboard);
+
+if (WAP tokens present AND "AppleWebKit",\n"UP.Browser/3" absent?) then (yes)
   #FFE0E0:epoch = -1 (EPOCH_WML);
   :Content-Type = text/vnd.wap.wml\n(WBXML via the WAP gateway);
   :Template style: WML <card> deck,\nno HTML, text + <a> links only;\nLatin-1, 860-byte pages;
   stop
 endif
 
-if (Lynx / Cello / Line Mode Browser?) then (yes)
+if (Lynx / w3m / ELinks / Cello / LineMode?) then (yes)
   #FFF3E0:epoch = 0 (EPOCH_PRESTANDARD);
-  :Content-Type = text/html; charset=UTF-8\n(Cello: bare text/html + Latin-1 body,\nper request_charset);
+  :Content-Type = text/html; charset=UTF-8\n(Cello, Line Mode: bare text/html + Latin-1 body,\nper request_charset);
   :Template style: bare <html>,\nno styling attributes,\n<h1>/<h2>/<hr>/<a> only;
   stop
 endif

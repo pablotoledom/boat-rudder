@@ -114,6 +114,11 @@ Loads `error_epoch<N>.html` and fills its 2 `%s` placeholders (status code, mess
 
 ### Routes
 
+**`EPOCH_MODERN` only** below means `dashboard_allowed()` (`http_router.c`): the request resolves
+to epoch 3 **and** the browser detection rules grant its real `User-Agent` the dashboard (factory:
+Chrome 111, Firefox 121, Safari 16.2 - the admin stylesheet's floor, [epochs.md](epochs.md)). An
+epoch 3 browser below that floor sees "needs a more recent browser" on `/login` and `/dashboard`.
+
 | Route | Method | Behavior |
 |---|---|---|
 | `/login` | `GET` | If `mongodb_manager_is_ready()` and the request carries a valid session cookie, `302 /dashboard`. Otherwise renders `login_epoch<N>.html` via `buildPageWebSite()`. For `EPOCH_MODERN`, a real form; other epochs show "not available". |

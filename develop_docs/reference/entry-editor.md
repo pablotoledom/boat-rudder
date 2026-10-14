@@ -3,7 +3,7 @@
 An AJAX content editor for one `entries` document - meta (link/type/enabled/categories),
 header (cover image, date, per-language title/summary, read-only author) and `content[]` blocks
 - with live preview, drag-and-drop reordering, rich-text editing, and optional autosave.
-**`EPOCH_MODERN` only**, session-guarded via `require_dashboard_session_role()`.
+**`EPOCH_MODERN` only** (with the rules' dashboard flag - see [dashboard.md](dashboard.md#routes)), session-guarded via `require_dashboard_session_role()`.
 
 Diagrams: [entry-editor-components.puml](../diagrams/entry-editor-components.puml),
 [sequence-entry-editor-edit-route.puml](../diagrams/sequence-entry-editor-edit-route.puml),

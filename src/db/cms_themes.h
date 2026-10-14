@@ -116,11 +116,12 @@ typedef struct {
 // default to navbar_menu_normal's own default per theme (see cms_themes.c's
 // THEME_DEFAULTS), so an unedited theme keeps rendering exactly as before.
 // link_hover applies to epoch 2/3, as a real `a:hover` CSS rule - epoch 2's
-// real browsers (Netscape 4 and up, through Chrome <10/Firefox <4/IE10)
-// support CSS1's :hover fine, unlike the navbar's own hover color (see
-// navbar_menu_hover above), which the menu template never uses at epoch 2
-// since the unselected/selected item is colored directly via <font color>
-// instead of relying on a hover interaction. Epoch 1 predates CSS entirely
+// real browsers (MSIE 4-11 and the modern engines below epoch 3's floors -
+// see develop_docs/reference/epochs.md) apply `a:hover` (CSS2) fine;
+// Netscape 4 ignores it and keeps the plain link color. The navbar's own
+// hover color (navbar_menu_hover above) is not used at epoch 2 at all: the
+// menu template colors the unselected/selected item directly via
+// <font color> instead of relying on a hover interaction. Epoch 1 predates CSS entirely
 // (no :hover to have), so link_hover simply isn't used there. The other
 // three (link_normal/visited/active) apply to epoch 1/2/3 as real
 // a:link/a:visited/a:active - HTML's <body link/vlink/alink> attributes

@@ -18,11 +18,11 @@ typedef struct {
 
 static const update_item_t UPDATES[] = {
     {"Boat Rudder is online", "2026",
-     "A retro-compatible site that serves the right HTML for every browser, "
-     "from WAP phones to modern Chrome."},
+     "A retro-compatible site that serves the right markup for every browser, "
+     "from the first web browsers of 1991 to modern Chrome."},
     {"Five epochs, one codebase", "2026",
-     "Every page is assembled from epoch-specific templates: WML, plain "
-     "text, HTML 3.2, HTML4+CSS and HTML5+CSS3."},
+     "Every page is assembled from epoch-specific templates: plain text "
+     "(HTML 2.0), HTML 3.2, HTML 4 + CSS1, WML for WAP phones and HTML5 + CSS3."},
     {"More to come", "2026",
      "New sections will be added soon, all following the same "
      "retro-compatible approach."},

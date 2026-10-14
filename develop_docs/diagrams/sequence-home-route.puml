@@ -90,7 +90,7 @@ else all components OK
   deactivate ORCH
 
   ROUTER -> RESP : build_epoch_response(body, "", epoch)
-  RESP -> RESP : ?lang (epochs -1/0/1), WML pagination,\n?theme (epochs 1/2), WML fixups,\nLatin-1 (epoch 1, WML, Cello)
+  RESP -> RESP : ?lang (epochs -1/0/1), WML pagination,\n?theme (epochs 1/2), WML fixups,\nLatin-1 (epoch 1, WML, Cello,\nLine Mode, HTTP/0.9)
   RESP --> ROUTER : response\n(headers + body)
   ROUTER -> ROUTER : free(body)
 

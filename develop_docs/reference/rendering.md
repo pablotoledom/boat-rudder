@@ -13,17 +13,21 @@ route), [templates-catalog.md](templates-catalog.md) (every template and its arg
 
 ## Retro-Compatible CMS (epoch-based rendering)
 
-The `/` route is rendered dynamically instead of being served as a static file. The goal is to send each
-client the simplest markup its browser can handle, from WAP-era phones to modern HTML5/CSS3 browsers.
+Every dynamic route (`/`, `/blog`, `/page/<link>`, ...) is rendered on the fly instead of being served as
+a static file. The goal is to send each client the simplest markup its browser can handle, from the
+first web browsers of 1991 (HTTP/0.9, plain text), through HTML 3.2 and HTML 4 browsers and WAP
+phones, to modern HTML5/CSS3 browsers.
 
 ### Epochs
 
-`utils/detect_epoch.c` classifies the `User-Agent` header into one of five epochs:
+`utils/detect_epoch.c` classifies the `User-Agent` header into one of five epochs. What each one
+is, technically - protocol, encoding, HTML, CSS and JS level, full-fidelity floor - is
+[epochs.md](epochs.md):
 
 | Epoch | Constant | Target | `Content-Type` |
 |---|---|---|---|
 | -1 | `EPOCH_WML` | WAP 1.x phones | `text/vnd.wap.wml` |
-| 0 | `EPOCH_PRESTANDARD` | Text browsers (e.g. Lynx, w3m, ELinks) - and Cello | `text/html; charset=UTF-8` (bare `text/html` for Cello) |
+| 0 | `EPOCH_PRESTANDARD` | Text browsers (e.g. Lynx, w3m, ELinks), Cello, the CERN Line Mode Browser, any HTTP/0.9 client | `text/html; charset=UTF-8` (bare `text/html` for Cello, Line Mode and HTTP/0.9) |
 | 1 | `EPOCH_EARLY` | Mosaic, Netscape 1-2, MSIE ≤ 3 (table layouts, `<font>`) | `text/html` |
 | 2 | `EPOCH_MIDDLE` | Netscape 3-4, MSIE 4-11, EdgeHTML, Opera 5-12, and anything below epoch 3's floors - table layout, no external stylesheet | `text/html; charset=UTF-8` |
 | 3 | `EPOCH_MODERN` | Chrome 87+, Firefox 66+, Safari 14.1+ / iOS 14.5+ | `text/html; charset=UTF-8` |
@@ -55,7 +59,8 @@ known type shows "Undefined Viewer for MIME Type" instead of the page. Epoch 0's
 reader is a modern terminal emulator (Lynx/w3m/ELinks running today in a UTF-8 locale) rather
 than a genuinely pre-Unicode machine, so it keeps a normal UTF-8 declaration; epoch 1 and WML
 predate UTF-8 outright and are transcoded to Latin-1 instead - see "Character encoding" below,
-which also covers the one real pre-Unicode browser classified into epoch 0 (Cello).
+which also covers the genuinely pre-Unicode readers classified into epoch 0 (Cello, the Line Mode
+Browser, HTTP/0.9 clients).
 
 Which epoch renders a request is decided by `resolve_epoch()` (`http_router.c`): `force_epoch`
 from the config if set, otherwise a valid `?preview_epoch=N` (the dashboard's preview iframe -
@@ -215,7 +220,7 @@ Each visual component has one HTML template per epoch, named `<component>_epoch<
   `gallery-page-thumbstrip_epoch{1,2}.html` (one `%s` wrapping the thumbnail rows) and
   `gallery-page-thumb_epoch{1,2}.html`; epoch 3 uses a `gallery-page-item_epoch3.html` grid.
   Epochs -1/0 render `gallery-page-qr_epoch<N>.html` instead - a QR code (WBMP image for WML,
-  Unicode half-block `<pre>` art for epoch 0, Latin-1 block art for Cello - see "Character
+  Unicode half-block `<pre>` art for epoch 0, Latin-1 block art for its pre-Unicode readers - see "Character
   encoding" below for why they need different renderings) encoding a short `/qr/<code>` link to
   the gallery (`public_url`-based when configured - see
   [qr-and-short-links.md](qr-and-short-links.md)), plus that URL again as a plain text link -
@@ -574,12 +579,26 @@ garbled text instead of decoding them, since HTTP/0.9 (1991) predates images/MIM
 entirely. `serve_static_file()` (`http_router.c`) now always sends a full status line and headers,
 regardless of which request style triggered it.
 
+Pages are the other way round. A **genuine** HTTP/0.9 client - WorldWideWeb (1990), the early Line
+Mode Browser, ViolaWWW, Erwise - sends the version-less line and *no headers at all*, and shows
+whatever arrives as the document: a status line and headers would print as the top of the page.
+For that request (`is_http09_request()`: no version **and** no headers) the router sets the
+connection's `simple_response` flag, and `connection_write()` drops everything up to the blank
+line ending the header block - the RFC 1945 Simple-Response - for every dynamic page and error
+page. The static-file branch clears the flag first, so files keep their headers as above (Cello's
+version-less image fetches). Such a request has no `User-Agent` to classify, so
+`resolve_epoch()` gives it **epoch 0** (after `force_epoch` / `?preview_epoch`), in Latin-1 (see
+below). A browser older than HTML 2.0 still reads it: HTML's rule since 1991 is that unknown tags
+are ignored and their text shown, so what epoch 0 uses beyond the 1991-92 tag set (`html`/`head`/
+`body`, `hr`, `br`, `b`, `i`, `pre`) costs formatting, never content.
+
 ### Character encoding
 
-Epoch 1, WML, and Cello in epoch 0.
+Epoch 1, WML, and the pre-Unicode readers of epoch 0: Cello, the CERN Line Mode Browser
+(`LineMode/`, `W3CLineMode/`) and any HTTP/0.9 client (`request_charset.c`).
 
 Every stored/authored string in the CMS is UTF-8, but UTF-8 wasn't defined until 1993 and didn't
-reach the web until HTML 4 (1997) - epoch 1 (NCSA Mosaic, Cello) and WML predate it entirely and
+reach the web until HTML 4 (1997) - epoch 1 (NCSA Mosaic), Cello and WML predate it entirely and
 assume ISO-8859-1, HTTP's own default charset (RFC 1945/2616). Handed raw UTF-8 bytes with no
 matching charset, they render each encoded character as two/three separate Latin-1 glyphs (e.g.
 "SÃguenos" for "Síguenos") - confirmed live in both a real NCSA Mosaic build and a WAP emulator.
@@ -591,18 +610,20 @@ prolog additionally declares `encoding="ISO-8859-1"` (`layout_epoch-1.html` and 
 shells) - without it, a compliant XML parser defaults to assuming UTF-8 and rejects the very
 Latin-1 bytes the transcode just produced as invalid.
 
-Epoch 0 is deliberately **not** included in this transcode, even though it shares the "text-only"
-label with epoch 1: its realistic reader today is a terminal browser (Lynx/w3m/ELinks) running in
-a UTF-8 locale, not a genuinely pre-Unicode machine, so it keeps plain UTF-8 - see the epoch table
-above. This is also why QR codes are drawn differently per epoch: epoch 0's Unicode half-block
+Epoch 0 is **not** transcoded by default, even though it shares the "text-only" label with epoch
+1: its usual reader today is a terminal browser (Lynx/w3m/ELinks) running in a UTF-8 locale, not a
+genuinely pre-Unicode machine, so it keeps plain UTF-8 - see the epoch table above - except for the
+pre-Unicode readers below. This is also why QR codes are drawn differently per epoch: epoch 0's Unicode half-block
 art (two QR modules packed into one terminal row, correcting for a monospace cell being taller
 than it is wide) assumes the UTF-8 terminal that epoch actually targets, while epoch 1/WML get a
 GIF/WBMP image instead.
 
-**The Cello exception (`request_charset`).** Cello (1993) is a genuinely pre-Unicode GUI browser,
-but it lands in epoch 0 because its feature set (no dependable inline images) matches epoch 0's
-templates, not epoch 1's. `request_charset_set(User-Agent)` (`src/utils/request_charset.c`)
-records, per request, whether the **real** browser needs the Latin-1 downgrade. When it does,
+**The pre-Unicode exception (`request_charset`).** Three readers of epoch 0 predate UTF-8: Cello
+(1993), a GUI browser that lands in epoch 0 because its feature set (no dependable inline images)
+matches epoch 0's templates, not epoch 1's; the CERN Line Mode Browser (`LineMode/`,
+`W3CLineMode/`); and any HTTP/0.9 client, which sends no `User-Agent` at all.
+`request_charset_set(User-Agent, http09)` (`src/utils/request_charset.c`) records, per request,
+whether the **real** browser needs the Latin-1 downgrade. When it does,
 `build_epoch_response.c` transcodes epoch 0 bodies too, sends bare `text/html`, and the QR
 generators switch to `generate_qr_asciiblock_text()` - Latin-1 `Û Ü ß`, which become the CP437
 block glyphs `0xDB/0xDC/0xDF` in the "Terminal" font. This flag deliberately ignores
@@ -682,7 +703,7 @@ applies, in order:
 | WML pagination | −1, unless `?wml_pages=all` | `wml_paginate()` - see below |
 | Theme re-tagging | 1, 2 | `?theme=<key>` on every site-relative link |
 | WML fixups | −1 | `<br>` → `<br/>`, HTML lists → `- item<br/>` lines |
-| Latin-1 transcode | −1, 1, and 0 for Cello | `utf8_to_latin1()` |
+| Latin-1 transcode | −1, 1, and 0 for Cello, Line Mode and HTTP/0.9 | `utf8_to_latin1()` |
 
 Then it adds the epoch's `Content-Type`, `X-Content-Type-Options` and `X-Frame-Options`, and any
 extra headers the route passed (e.g. `Cache-Control: no-store` for drafts). Redirects

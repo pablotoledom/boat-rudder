@@ -143,7 +143,7 @@ boat-rudder/
 │       ├── request_lang.c/h             # Per-request content language + request path
 │       ├── request_theme.c/h            # Per-request theme (?theme= → cookie → DB → config)
 │       ├── request_user.c/h             # Per-request signed-in user's display name
-│       ├── request_charset.c/h          # Per-request "real browser needs Latin-1" (Cello)
+│       ├── request_charset.c/h          # Per-request "real browser needs Latin-1" (Cello, Line Mode, HTTP/0.9)
 │       ├── request_code_lines.c/h       # Per-request ?code_lines=off
 │       ├── request_wml.c/h              # Per-request WML target + ?wml_pages=all
 │       ├── theme_catalog.c/h            # Theme discovery/validation under html/themes/
@@ -305,12 +305,16 @@ Both `ssl_read` and `plain_read` share the `read_func_t` signature so the rest o
   prove more data is still coming before the loop gives up waiting for one - long enough not to
   mistake a slow, well-formed multi-packet request for a truncated one. See
   [rendering.md](rendering.md#legacy-http-compatibility) for
-  the real client behavior (Cello 1.x) this was fixed against.
+  the real client behavior (Cello 1.x) this was fixed against. A genuine HTTP/0.9 request (no
+  version **and** no headers) also sets the connection's `simple_response` flag: every page and
+  error is then sent as an RFC 1945 Simple-Response - `connection_write()` drops the status line
+  and headers - while the static-file branch clears it, so files keep their headers.
 - **Full body reading**: after headers are parsed, reads the body to completion using `Content-Length` - allocates a buffer of the declared size and loops until all bytes are received. A declared length above `MAX_BODY_SIZE` (10 MiB) is answered `413` before reading. This supports both small form posts and large multipart file uploads.
 - Parses headers with `parse_http_request()`.
 - Extracts the real client IP: honors `X-Real-IP` / `X-Forwarded-For` **only when the peer IP matches the `trusted_proxies` config list**, falling back to the raw socket address for all other peers.
 - Validates the request line (400 Bad Request on failure).
-- `resolve_epoch(req)`: the configured `force_epoch` override (if in `-1..3`), otherwise a valid `?preview_epoch=N` anywhere in the query string (the dashboard preview), otherwise `detect_epoch(User-Agent)`.
+- `resolve_epoch(req)`: the configured `force_epoch` override (if in `-1..3`), otherwise a valid `?preview_epoch=N` anywhere in the query string (the dashboard preview), otherwise epoch 0 for a genuine HTTP/0.9 request (no `User-Agent` to classify), otherwise `detect_epoch(User-Agent)` - the browser detection rules ([epochs.md](epochs.md)).
+- `dashboard_allowed(req, epoch)`: the gate of `/login` and every `/dashboard*` route - epoch 3 **and** the `dashboard` flag the rules give the real `User-Agent`.
 - **Per-request state**, set once before routing and read anywhere below through thread-local
   getters: `request_lang_set()` (`?lang=` / cookie / default), `request_path_set()`,
   `request_user_set()` (session → display name), `request_theme_set()` (`?theme=` / cookie /
@@ -403,7 +407,7 @@ Both `ssl_read` and `plain_read` share the `read_func_t` signature so the rest o
 - `generate_youtube_qr()` (GIF, epochs 1-2), `generate_youtube_qr_wbmp()` and
   `generate_qr_wbmp(text, fs_path)` (any text → WBMP via `wbmp_writer.c`, cached on disk; used
   for WML), `generate_qr_halfblock_text(text)` (any text → Unicode half-block `<pre>` art; epoch
-  0 in a UTF-8 terminal) and `generate_qr_asciiblock_text(text)` (Latin-1 block glyphs for Cello,
+  0 in a UTF-8 terminal) and `generate_qr_asciiblock_text(text)` (Latin-1 block glyphs for Cello, Line Mode and HTTP/0.9,
   chosen when `request_needs_legacy_charset()` - see
   [rendering.md](rendering.md#character-encoding)). Long targets are shortened through
   `/qr/<code>` first - see [qr-and-short-links.md](qr-and-short-links.md).

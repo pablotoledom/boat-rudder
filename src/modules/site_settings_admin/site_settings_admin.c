@@ -101,8 +101,8 @@ cleanup:
 static const char *EPOCH_LABELS[EPOCH_COUNT] = {
     "Epoch -1 (WAP / WML)",
     "Epoch 0 (text browsers)",
-    "Epoch 1 (early HTML, tables/font)",
-    "Epoch 2 (HTML 3.2 tables)",
+    "Epoch 1 (HTML 3.2, tables/font)",
+    "Epoch 2 (HTML 4.01 tables, CSS1)",
     "Epoch 3 (modern)",
 };
 

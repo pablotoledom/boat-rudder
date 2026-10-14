@@ -61,7 +61,7 @@ STATIC --> ROUTER : 0 (sent) | 403/404/500\n[caller renders error]
 ROUTER --> MONGO : mongodb_manager_is_ready()
 ROUTER --> ROLES : require_dashboard_session_role()\nrequire_admin_session()
 ROLES --> MONGO : mongodb_manager_get_collection("users")
-ROUTER --> AUTH : auth_login_user(email, password)\n[POST /login, EPOCH_MODERN only]
+ROUTER --> AUTH : auth_login_user(email, password)\n[POST /login, dashboard_allowed():\nEPOCH_MODERN + rules' dashboard flag]
 ROUTER --> SESSION : generate_session_token()\ncreate_session() / validate_session_cookie()\ndestroy_session()\nbuild_session_cookie_header()
 
 AUTH --> MONGO : mongodb_manager_get_collection("users")
@@ -78,7 +78,7 @@ DASHBOARD --> READFILE
 ERROR --> READFILE
 ORCH --> READFILE
 
-LOGIN --> TPL : render_template(login_epoch3, error_block)\n[EPOCH_MODERN only]
+LOGIN --> TPL : render_template(login_epoch3, error_block)\n[dashboard_allowed() only]
 ERROR --> TPL : render_template(error_epoch<N>,\nstatus_code, message)
 ORCH --> TPL : str_replace_first({{PAGE_TITLE}})
 
@@ -87,10 +87,12 @@ READFILE --> FS
 
 note right of LOGIN
   /login form + credential checks:
-  EPOCH_MODERN only, enforced on
-  both GET and POST.
-  Other epochs: static
-  "not available" message.
+  EPOCH_MODERN + the detection rules'
+  dashboard flag (dashboard_allowed()),
+  enforced on both GET and POST.
+  Other epochs: static "not available";
+  older epoch 3: "needs a more recent
+  browser".
 end note
 
 note bottom of MONGO
