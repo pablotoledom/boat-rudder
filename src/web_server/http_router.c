@@ -20,6 +20,7 @@
 #include "../db/session_manager.h"
 #include "../db/short_links.h"
 #include "../html_builder/orchestrator.h"
+#include "../html_builder/page_layout.h"
 #include "../modules/analytics/analytics.h"
 #include "../modules/analytics_view/analytics_view.h"
 #include "../modules/blog_list/blog_list.h"
@@ -38,6 +39,8 @@
 #include "../modules/media_admin/media_admin.h"
 #include "../modules/menu_admin/menu_admin.h"
 #include "../modules/site_settings_admin/site_settings_admin.h"
+#include "../modules/browser_detection_admin/browser_detection_admin.h"
+#include "../db/cms_browser_detection.h"
 #include "../modules/users_admin/users_admin.h"
 #include "../db/cms_media.h"
 #include "../db/cms_media_galleries.h"
@@ -70,6 +73,7 @@
 #include <strings.h>
 #include <poll.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -122,11 +126,12 @@ static void media_variant_path(char *out, size_t out_size, const char *dir_path,
              force_gif ? ".gif" : (ext ? ext : ""));
 }
 
-// scripts/image-optimizer.sh also leaves a symlink under the upload's
-// original name (e.g. photo.png -> photo_half.gif), whose extension the DB
-// record no longer carries (it stores photo.gif). The upload allowlist
-// bounds which extensions that can be; each is tried and only ever acted on
-// when it is a symlink, so another item's real file is never touched.
+// Uploads made before scripts/image-optimizer.sh stopped creating it have a
+// base-name symlink to _half, under the stored name (photo.jpg) or the
+// uploaded extension (photo.png), which the DB record doesn't carry; the
+// upload allowlist bounds which extensions that can be, so each is tried,
+// and only ever acted on when it is a symlink - another item's real file is
+// never touched.
 static const char *media_upload_link_exts[] = {
     ".jpg", ".jpeg", ".png", ".gif", ".webp",
     ".JPG", ".JPEG", ".PNG", ".GIF", ".WEBP", NULL
@@ -224,9 +229,13 @@ static int resolve_or_create_default_media_directory(const char *user_id, const 
                                                       CmsMediaDirectory *out) {
     if (cms_get_media_directory_by_name("default", user_id, out)) return 0;
 
-    char dirpath[512];
-    snprintf(dirpath, sizeof(dirpath), "./html/content/posts/%s/default", username);
+    // A new author has no folder under posts/ yet: create it first, as the
+    // directory-create route does, or the default one can't be made.
+    char author_path[512], dirpath[sizeof(author_path) + 16];
+    snprintf(author_path, sizeof(author_path), "./html/content/posts/%s", username);
+    snprintf(dirpath, sizeof(dirpath), "%s/default", author_path);
     struct stat st;
+    if (stat(author_path, &st) == -1) mkdir(author_path, 0775);
     if (stat(dirpath, &st) == -1 && mkdir(dirpath, 0775) != 0) {
         LOG_ERROR("resolve_or_create_default_media_directory: could not create %s: %s",
                   dirpath, strerror(errno));
@@ -293,23 +302,110 @@ static int media_can_manage(const char *role, const char *user_id, const char *o
 }
 
 // Upload allowlist: the formats scripts/image-optimizer.sh turns into its
-// JPEG/GIF variants, checked on both the extension and the file's magic
-// bytes. Anything else - .html, .svg, .js... - would otherwise be stored and
-// served from the site's own origin. Returns 1 when `name`'s extension and
-// `data` agree on one of them.
-static int media_upload_is_allowed_image(const char *name, const unsigned char *data, size_t len) {
-    const char *ext = strrchr(name, '.');
-    if (!ext || ext == name) return 0;
+// JPEG/GIF variants, recognized by the file's magic bytes - its content, not
+// its name. Returns the extension that format is stored under (".jpg",
+// ".png", ".gif", ".webp"), or NULL for anything else: .html, .svg, .js...
+// would otherwise be stored and served from the site's own origin.
+static const char *media_image_extension(const unsigned char *data, size_t len) {
+    if (len >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF) return ".jpg";
+    if (len >= 8 && memcmp(data, "\x89PNG\r\n\x1a\n", 8) == 0) return ".png";
+    if (len >= 6 && (memcmp(data, "GIF87a", 6) == 0 || memcmp(data, "GIF89a", 6) == 0)) return ".gif";
+    if (len >= 12 && memcmp(data, "RIFF", 4) == 0 && memcmp(data + 8, "WEBP", 4) == 0) return ".webp";
+    return NULL;
+}
 
-    if (strcasecmp(ext, ".jpg") == 0 || strcasecmp(ext, ".jpeg") == 0)
-        return len >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF;
-    if (strcasecmp(ext, ".png") == 0)
-        return len >= 8 && memcmp(data, "\x89PNG\r\n\x1a\n", 8) == 0;
-    if (strcasecmp(ext, ".gif") == 0)
-        return len >= 6 && (memcmp(data, "GIF87a", 6) == 0 || memcmp(data, "GIF89a", 6) == 0);
-    if (strcasecmp(ext, ".webp") == 0)
-        return len >= 12 && memcmp(data, "RIFF", 4) == 0 && memcmp(data + 8, "WEBP", 4) == 0;
+// An uploaded file's name as it is stored: in the part before the last dot
+// (the stem) spaces and dots become '_', every character outside
+// [A-Za-z0-9_-] is dropped, and an empty result becomes "image"; the
+// extension keeps only [A-Za-z0-9] (media_name_with_extension() then makes
+// it the content's real one). Nothing that could break out of a path, a
+// URL, an HTML attribute or image-optimizer.sh's command line survives. The
+// stem is capped so "_N" and the optimizer's "_full"/"_half"... still fit.
+#define MEDIA_UPLOAD_STEM_MAX 120
+
+static void media_sanitize_upload_name(const char *raw, char *out, size_t size) {
+    const char *last_dot = strrchr(raw, '.');
+    const char *stem_end = last_dot ? last_dot : raw + strlen(raw);
+
+    size_t j = 0;
+    for (const char *p = raw; p < stem_end && j < MEDIA_UPLOAD_STEM_MAX && j + 1 < size; p++) {
+        char c = *p;
+        if (c == ' ' || c == '.') out[j++] = '_';
+        else if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                 (c >= '0' && c <= '9') || c == '-' || c == '_') out[j++] = c;
+    }
+    if (j == 0) j = (size_t)snprintf(out, size, "image");
+
+    if (last_dot && j + 1 < size) {
+        size_t dot_at = j;
+        out[j++] = '.';
+        for (const char *p = last_dot + 1; *p && j + 1 < size; p++) {
+            char c = *p;
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) out[j++] = c;
+        }
+        if (j == dot_at + 1) j = dot_at; // nothing usable after the dot
+    }
+    out[j] = '\0';
+}
+
+// Whether an earlier upload in `dirpath` already uses `stem`: its base-name
+// link (under any image extension - "photo.png" and "photo.jpg" share their
+// variants) or its _full/_half variant. lstat(), since the base name is a
+// symlink to _half.
+static int media_stem_taken(const char *dirpath, const char *stem) {
+    static const char *suffixes[] = {
+        ".jpg", ".jpeg", ".png", ".gif", ".webp",
+        "_full.jpg", "_full.gif", "_half.jpg", "_half.gif",
+    };
+    for (size_t i = 0; i < sizeof(suffixes) / sizeof(suffixes[0]); i++) {
+        char path[1024];
+        struct stat st;
+        snprintf(path, sizeof(path), "%s/%s%s", dirpath, stem, suffixes[i]);
+        if (lstat(path, &st) == 0) return 1;
+    }
     return 0;
+}
+
+// Gives `name` ("stem.ext") a stem no earlier upload in `dirpath` uses,
+// appending "_2", "_3"... - an upload never overwrites another's files.
+// Returns 0 if no free name is found.
+static int media_unique_name(const char *dirpath, char *name, size_t size) {
+    char stem[MEDIA_UPLOAD_STEM_MAX + 1], ext[32] = "";
+    const char *dot = strrchr(name, '.');
+    size_t stem_len = dot ? (size_t)(dot - name) : strlen(name);
+    if (stem_len > MEDIA_UPLOAD_STEM_MAX) stem_len = MEDIA_UPLOAD_STEM_MAX;
+    memcpy(stem, name, stem_len);
+    stem[stem_len] = '\0';
+    if (dot) snprintf(ext, sizeof(ext), "%s", dot);
+
+    if (!media_stem_taken(dirpath, stem)) return 1;
+    for (int n = 2; n < 10000; n++) {
+        char candidate[MEDIA_UPLOAD_STEM_MAX + 8];
+        snprintf(candidate, sizeof(candidate), "%s_%d", stem, n);
+        if (!media_stem_taken(dirpath, candidate)) {
+            int written = snprintf(name, size, "%s%s", candidate, ext);
+            return written > 0 && (size_t)written < size;
+        }
+    }
+    return 0;
+}
+
+// Makes `name` end in the extension of the format its content really is, so
+// the stored file is always served as what it is: "photo.jpg" holding a
+// WebP becomes "photo.webp", "photo" becomes "photo.jpg". An extension that
+// already matches is kept as written ("photo.JPEG" stays). Returns 0 if the
+// result doesn't fit in `size`.
+static int media_name_with_extension(char *name, size_t size, const char *ext) {
+    char *dot = strrchr(name, '.');
+    if (dot && dot != name) {
+        if (strcasecmp(dot, ext) == 0 ||
+            (strcmp(ext, ".jpg") == 0 && strcasecmp(dot, ".jpeg") == 0)) return 1;
+        *dot = '\0';
+    }
+    size_t len = strlen(name);
+    if (len + strlen(ext) + 1 > size) return 0;
+    memcpy(name + len, ext, strlen(ext) + 1);
+    return 1;
 }
 
 // Writes an HTML fragment (a media directory <li>) as a 200 response.
@@ -354,6 +450,14 @@ static void send_simple(void *ctx, const char *status, const char *body) {
 // straight off req->url (rather than requiring every call site to have
 // already parsed the query string into params[]) is what lets one change
 // here cover every route.
+// A request with no HTTP version and no headers at all: the HTTP/0.9
+// "simple request" of a 1990-92 browser. (Cello sends version-less requests
+// too, but its page requests carry headers - it is classified by its
+// User-Agent like any other.)
+static int is_http09_request(const HttpRequest *req) {
+    return req->protocol[0] == '\0' && req->header_count == 0;
+}
+
 static int resolve_epoch(HttpRequest *req) {
     if (force_epoch >= EPOCH_WML && force_epoch <= EPOCH_MODERN) return force_epoch;
 
@@ -364,7 +468,19 @@ static int resolve_epoch(HttpRequest *req) {
         if (preview_epoch >= EPOCH_WML && preview_epoch <= EPOCH_MODERN) return preview_epoch;
     }
 
+    // No User-Agent to classify, and a browser older than tables: text.
+    if (is_http09_request(req)) return EPOCH_PRESTANDARD;
+
     return detect_epoch(get_header_value(req, "User-Agent"));
+}
+
+// Whether `req` may use /login and /dashboard: an epoch 3 page (after
+// force_epoch / ?preview_epoch) for a browser the detection rules grant the
+// dashboard - whose stylesheet needs more than the public epoch 3 one. The
+// second half reads the real User-Agent, so ?preview_epoch=3 cannot lift an
+// older browser into the dashboard.
+static int dashboard_allowed(HttpRequest *req, int epoch) {
+    return epoch == EPOCH_MODERN && detect_dashboard(get_header_value(req, "User-Agent"));
 }
 
 // Renders the centralized error_epoch<N>.html template via error_content() +
@@ -640,7 +756,7 @@ static int match_id_route(const char *decoded_url, const char *prefix,
 
 // Matches "/themes/<key>/styles_epoch3.css" or "/themes/<key>/styles_admin_epoch3.css"
 // exactly, extracting <key> and which stylesheet it is - the dynamic route that
-// serves a theme's (possibly DB-overridden, see cms_get_theme_css()) epoch 3
+// serves a theme's (possibly DB-customized, see cms_get_theme_css()) epoch 3
 // stylesheets, ahead of the generic static-file fallback at the bottom of the
 // GET dispatch chain.
 static int match_theme_css_url(const char *decoded_url, char *key_out, size_t key_size,
@@ -697,27 +813,28 @@ static void theme_css_editor_url(char *out, size_t out_size, const char *key, Th
 }
 
 // Theme-asset endpoints (/dashboard/api/theme-assets/*) back the banner,
-// footer and logo editors' image upload/browse widget: they write straight
-// into html/themes/<theme>/assets/<component>/epoch<N>/, the same
-// directories the theme's own mainbanner/footer/menu-logo markup already
-// references - not the content media library (html/content/posts/...,
-// per-author, gallery-oriented).
+// footer and logo editors' image upload/browse widget: they write into
+// html/content/themes/<theme>/<component>/epoch<N>/ - site content, next to
+// the media library's html/content/posts/, never the theme's own
+// html/themes/<theme>/assets/, which ships with Boat Rudder and an update
+// overwrites. So the widget only lists (and can only delete) the admin's
+// uploads, never the images the theme's default markup uses.
 //
 // `key` is the theme being edited - taken explicitly from the request
 // (query string), never from request_theme() (the admin's own active
 // theme for this request, which need not be the theme whose banner/footer/
 // logo editor is open - see theme-scoped-personalization-plan.md §4).
-// `component` is restricted to the three directories this feature actually
-// uses ("menu" backs the logo editor - see site_settings_logo_page());
+// `component` is the editor's own name: "banner", "footer", "logo" or
+// "home-blog" (the home blog list's background image);
 // `epoch_str` must be one of "-1".."3". Fills dir_out (>= 256 bytes) with
-// "./html/themes/<key>/assets/<component>/epoch<epoch_str>" and returns 1,
+// "./html/content/themes/<key>/<component>/epoch<epoch_str>" and returns 1,
 // or returns 0 (dir_out untouched) if any argument is invalid.
 static int theme_assets_dir(const char *key, const char *component, const char *epoch_str,
                              char *dir_out, size_t dir_size) {
     if (!theme_key_is_valid(key)) return 0;
     if (!component || !epoch_str) return 0;
-    if (strcmp(component, "mainbanner") != 0 && strcmp(component, "footer") != 0 &&
-        strcmp(component, "menu") != 0)
+    if (strcmp(component, "banner") != 0 && strcmp(component, "footer") != 0 &&
+        strcmp(component, "logo") != 0 && strcmp(component, "home-blog") != 0)
         return 0;
 
     static const char *valid_epochs[] = {"-1", "0", "1", "2", "3"};
@@ -727,15 +844,14 @@ static int theme_assets_dir(const char *key, const char *component, const char *
     }
     if (!epoch_ok) return 0;
 
-    int n = snprintf(dir_out, dir_size, "./html/themes/%s/assets/%s/epoch%s",
+    int n = snprintf(dir_out, dir_size, "./html/content/themes/%s/%s/epoch%s",
                       key, component, epoch_str);
     return n > 0 && (size_t)n < dir_size;
 }
 
 // mkdir() one path component at a time - unlike media uploads (whose parent
 // directory is always created up front by the "new directory" route), a
-// theme-asset directory may not exist yet (there is no epoch0/ under
-// assets/mainbanner/ today, and assets/footer/ doesn't exist at all).
+// theme-asset directory only exists once something was uploaded to it.
 static void mkdir_recursive(const char *dir) {
     char tmp[512];
     strncpy(tmp, dir, sizeof(tmp) - 1);
@@ -782,14 +898,52 @@ static int theme_asset_image_extension_ok(const char *filename) {
            has_extension_ci(filename, ".jpeg") || has_extension_ci(filename, ".gif");
 }
 
-// Epoch -1 (WAP/WML) devices need WBMP specifically; PNG/JPEG (not .gif -
-// stb_image.h isn't asked to decode GIF here, see image_convert.c's
-// STBI_ONLY_PNG/STBI_ONLY_JPEG) is auto-converted to it server-side (see the
-// upload handler below), so a direct .wbmp upload isn't offered as a
-// bypass - the point of the feature is nobody has to hand-produce one.
+// Epoch -1 (WAP/WML) uploads, every component: a PNG only. The PNG is kept -
+// the source for any later edit, and what the dashboard's WAP preview shows
+// (browsers can't read WBMP) - and the upload handler writes its 1-bit WBMP
+// twin next to it, the file real devices get (see wap_twin_name()). A direct
+// .wbmp upload isn't offered: nobody should have to hand-produce one.
 static int epoch_neg1_upload_extension_ok(const char *filename) {
-    return has_extension_ci(filename, ".png") || has_extension_ci(filename, ".jpg") ||
-           has_extension_ci(filename, ".jpeg");
+    return has_extension_ci(filename, ".png");
+}
+
+// An epoch -1 image's twin: "logo.png" <-> "logo.wbmp" - the same base name,
+// `ext` (".png"/".wbmp") instead of its extension. Returns 0 if `name` has
+// no extension or the result doesn't fit.
+static int wap_twin_name(const char *name, const char *ext, char *out, size_t out_size) {
+    const char *dot = strrchr(name, '.');
+    if (!dot || dot == name) return 0;
+    int n = snprintf(out, out_size, "%.*s%s", (int)(dot - name), name, ext);
+    return n > 0 && (size_t)n < out_size;
+}
+
+// The site favicons uploaded from /dashboard/settings (see page_layout.h's
+// page_layout_favicon_path()): a real .ico, at most FAVICON_MAX_BYTES, and
+// for epoch 2 - whose browsers read only the 16x16 image - one that has a
+// 16x16 entry. Checks the ICONDIR header and that every entry's image lies
+// inside the file. Returns NULL when `data` is acceptable, else the error
+// code /dashboard/settings shows a message for.
+#define FAVICON_MAX_BYTES (256 * 1024)
+
+static const char *favicon_ico_problem(const unsigned char *data, size_t len, int epoch) {
+    if (len == 0) return "favicon-type";
+    if (len > FAVICON_MAX_BYTES) return "favicon-size";
+    if (len < 6 || data[0] != 0 || data[1] != 0 || data[2] != 1 || data[3] != 0)
+        return "favicon-type";
+
+    size_t count = (size_t)data[4] | ((size_t)data[5] << 8);
+    if (count == 0 || 6 + 16 * count > len) return "favicon-type";
+
+    int has_16 = 0;
+    for (size_t i = 0; i < count; i++) {
+        const unsigned char *e = data + 6 + 16 * i;
+        size_t size = (size_t)e[8] | ((size_t)e[9] << 8) | ((size_t)e[10] << 16) | ((size_t)e[11] << 24);
+        size_t off  = (size_t)e[12] | ((size_t)e[13] << 8) | ((size_t)e[14] << 16) | ((size_t)e[15] << 24);
+        if (size == 0 || off > len || size > len - off) return "favicon-type";
+        if (e[0] == 16 && e[1] == 16) has_16 = 1;
+    }
+    if (epoch == EPOCH_MIDDLE && !has_16) return "favicon-16";
+    return NULL;
 }
 
 // Builds {"files":["name1","name2",...]} for the banner/footer editor's
@@ -1216,6 +1370,13 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
 
     LOG_INFO("%s %s %s", req.method, req.url, req.protocol);
 
+    // A genuine HTTP/0.9 client (WorldWideWeb, the early Line Mode Browser,
+    // ViolaWWW, Erwise): no version and, per its spec, no headers - so no
+    // User-Agent either. It expects the document alone, no status line or
+    // headers, which it would show as the start of the page. Static files
+    // turn this back off below (Cello). See is_http09_request().
+    ((connection_ctx_t *)ctx)->simple_response = is_http09_request(&req);
+
     // --- Determine real client IP ---
     // Honor X-Real-IP / X-Forwarded-For only from trusted reverse proxies.
     char client_ip[INET6_ADDRSTRLEN] = "unknown";
@@ -1241,9 +1402,9 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             const char *real_ip  = get_header_value(&req, "X-Real-IP");
             const char *fwd      = get_header_value(&req, "X-Forwarded-For");
             if (real_ip && real_ip[0]) {
-                strncpy(client_ip, real_ip, sizeof(client_ip) - 1);
+                snprintf(client_ip, sizeof(client_ip), "%s", real_ip);
             } else if (fwd && fwd[0]) {
-                strncpy(client_ip, fwd, sizeof(client_ip) - 1);
+                snprintf(client_ip, sizeof(client_ip), "%s", fwd);
                 char *comma = strchr(client_ip, ',');
                 if (comma) *comma = '\0';
                 // trim leading space
@@ -1251,12 +1412,11 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                 while (*p == ' ') p++;
                 if (p != client_ip) memmove(client_ip, p, strlen(p) + 1);
             } else {
-                strncpy(client_ip, peer_ip, sizeof(client_ip) - 1);
+                snprintf(client_ip, sizeof(client_ip), "%s", peer_ip);
             }
         } else {
-            strncpy(client_ip, peer_ip, sizeof(client_ip) - 1);
+            snprintf(client_ip, sizeof(client_ip), "%s", peer_ip);
         }
-        client_ip[sizeof(client_ip) - 1] = '\0';
     }
 
     {
@@ -1290,7 +1450,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
         // this resolves what the *real* visiting browser can decode, off
         // its actual User-Agent regardless of any override - see
         // utils/request_charset.h.
-        request_charset_set(get_header_value(&req, "User-Agent"));
+        request_charset_set(get_header_value(&req, "User-Agent"), is_http09_request(&req));
         request_code_lines_set(get_query_param(params, param_count, "code_lines"));
         request_wml_set(req.url, get_query_param(params, param_count, "wml_pages"));
         char content_lang[16];
@@ -1331,7 +1491,8 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
-                    char *content  = login(epoch, NULL);
+                    char *content  = dashboard_allowed(&req, epoch) ? login(epoch, NULL)
+                                                                    : login_unavailable(epoch);
                     char *body     = buildPageWebSite(epoch, "{{SITE_NAME}} - Login", content);
                     char *response = body ? build_epoch_response(body, "", epoch) : NULL;
                     free(body);
@@ -1354,7 +1515,9 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                             role[sizeof(role) - 1] = '\0';
                         }
 
-                        char *content  = dashboard(epoch, content_lang, user_id, role);
+                        char *content  = epoch == EPOCH_MODERN && !dashboard_allowed(&req, epoch)
+                                             ? login_unavailable(epoch)
+                                             : dashboard(epoch, content_lang, user_id, role);
                         char *body     = buildPageWebSite(epoch, "{{SITE_NAME}} - Dashboard", content);
                         char *response = body ? build_epoch_response(body, "", epoch) : NULL;
                         free(body);
@@ -1370,7 +1533,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                 // the entries pending publication.
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1388,7 +1551,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (strcmp(decoded_url, "/dashboard/categories") == 0) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1405,7 +1568,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (strcmp(decoded_url, "/dashboard/categories/new") == 0) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1432,7 +1595,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (match_id_route(decoded_url, "/dashboard/categories", "/edit", id, sizeof(id))) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1461,7 +1624,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (strcmp(decoded_url, "/dashboard/languages") == 0) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1478,7 +1641,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (strcmp(decoded_url, "/dashboard/menu") == 0) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1495,7 +1658,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (strcmp(decoded_url, "/dashboard/menu/new") == 0) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1522,7 +1685,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (match_id_route(decoded_url, "/dashboard/menu", "/edit", id, sizeof(id))) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1556,14 +1719,26 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (strcmp(decoded_url, "/dashboard/settings") == 0) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
                     char user_id[USER_ID_HEX_BUF_SIZE];
                     if (require_admin_session(ctx, &req, epoch, user_id)) {
+                        // ?error=<code> after a failed favicon upload.
+                        static const struct { const char *code, *message; } ERRORS[] = {
+                            { "favicon-type",  "The favicon must be an .ico file." },
+                            { "favicon-16",    "The epoch 2 favicon must contain a 16x16 image." },
+                            { "favicon-size",  "The favicon must be at most 256 KiB." },
+                            { "favicon-write", "Could not save the favicon." },
+                        };
+                        const char *error_code = get_query_param(params, param_count, "error");
+                        const char *error_message = NULL;
+                        for (size_t i = 0; error_code && i < sizeof(ERRORS) / sizeof(ERRORS[0]); i++)
+                            if (strcmp(error_code, ERRORS[i].code) == 0) error_message = ERRORS[i].message;
+
                         char *name     = cms_get_site_name();
-                        char *content  = site_settings_general_page(epoch, name, NULL);
+                        char *content  = site_settings_general_page(epoch, name, error_message);
                         free(name);
                         char *body     = buildPageWebSite(epoch, "{{SITE_NAME}} - Dashboard", content);
                         char *response = body ? build_epoch_response(body, "", epoch) : NULL;
@@ -1575,7 +1750,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (match_id_route(decoded_url, "/dashboard/settings/themes", "/banner", id, sizeof(id))) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1599,7 +1774,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (match_id_route(decoded_url, "/dashboard/settings/themes", "/footer", id, sizeof(id))) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1623,7 +1798,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (match_id_route(decoded_url, "/dashboard/settings/themes", "/logo", id, sizeof(id))) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1647,7 +1822,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (match_theme_css_editor(decoded_url, "", id, sizeof(id), &css_sheet)) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1656,9 +1831,11 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                         if (!theme_key_is_valid(id)) {
                             send_error_response(ctx, 404, "404 Not Found", epoch);
                         } else {
-                            char *value     = cms_get_theme_css(id, css_sheet);
-                            char *content   = site_settings_css_page(epoch, id, css_sheet, value);
-                            free(value);
+                            char *custom    = cms_get_theme_css_value(id, css_sheet);
+                            char *original  = cms_get_theme_css_original(id, css_sheet);
+                            char *content   = site_settings_css_page(epoch, id, css_sheet, custom, original);
+                            free(custom);
+                            free(original);
                             char *body      = buildPageWebSite(epoch, "{{SITE_NAME}} - Dashboard", content);
                             char *response  = body ? build_epoch_response(body, "", epoch) : NULL;
                             free(body);
@@ -1670,7 +1847,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (strcmp(decoded_url, "/dashboard/settings/preview") == 0) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1684,10 +1861,28 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                     }
                 }
 
+            } else if (strcmp(decoded_url, "/dashboard/settings/browsers") == 0) {
+                int epoch = resolve_epoch(&req);
+
+                if (!dashboard_allowed(&req, epoch)) {
+                    char *response = build_redirect_response("/dashboard", "", epoch);
+                    send_or_error(ctx, response, req.method, epoch);
+                } else {
+                    char user_id[USER_ID_HEX_BUF_SIZE];
+                    if (require_admin_session(ctx, &req, epoch, user_id)) {
+                        char *content  = browser_detection_admin_page(
+                            epoch, get_header_value(&req, "User-Agent"));
+                        char *body     = content ? buildPageWebSite(epoch, "{{SITE_NAME}} - Browser detection", content) : NULL;
+                        char *response = body ? build_epoch_response(body, "", epoch) : NULL;
+                        free(body);
+                        send_or_error(ctx, response, req.method, epoch);
+                    }
+                }
+
             } else if (strcmp(decoded_url, "/dashboard/settings/fonts") == 0) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1705,7 +1900,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (strcmp(decoded_url, "/dashboard/settings/themes") == 0) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1735,11 +1930,11 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                     }
                 }
 
-            } else if (match_id_route(decoded_url, "/dashboard/settings/themes", "", id, sizeof(id))) {
-                // One theme's options; the list above links here.
+            } else if (match_id_route(decoded_url, "/dashboard/settings/themes", "/customize", id, sizeof(id))) {
+                // The theme customizer; the list above links here.
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1748,25 +1943,60 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                         if (!theme_key_is_valid(id)) {
                             send_error_response(ctx, 404, "404 Not Found", epoch);
                         } else {
+                            ThemeCustomizeData data = {0};
                             char *active = cms_get_active_theme_key();
-                            ThemeEntry entry = {0};
-                            snprintf(entry.key, sizeof(entry.key), "%s", id);
-                            entry.active = strcmp(id, active) == 0;
-                            cms_get_theme_colors(id, &entry.colors);
+                            snprintf(data.theme.key, sizeof(data.theme.key), "%s", id);
+                            data.theme.active = strcmp(id, active) == 0;
                             free(active);
+                            cms_get_theme_colors(id, &data.theme.colors);
+                            cms_get_theme_banner_values(id, data.banner);
+                            cms_get_theme_footer_values(id, data.footer);
+                            for (int e = -1; e <= 3; e++) {
+                                cms_get_theme_logo_config(id, e, &data.logo[epoch_to_index(e)]);
+                                if (e == EPOCH_MIDDLE || e == EPOCH_MODERN) {
+                                    data.home_blog_background[epoch_to_index(e)] =
+                                        cms_get_theme_home_blog_background(id, e);
+                                    data.home_blog_item_background[epoch_to_index(e)] =
+                                        cms_get_theme_home_blog_item_background(id, e);
+                                }
+                            }
+                            data.home_blog_item_color_shown =
+                                cms_get_theme_home_blog_item_color_shown(id, EPOCH_MIDDLE);
+                            data.css_custom   = cms_get_theme_css_value(id, THEME_CSS_PUBLIC);
+                            data.css_original = cms_get_theme_css_original(id, THEME_CSS_PUBLIC);
 
-                            char *content  = site_settings_theme_page(epoch, &entry);
+                            char *content  = site_settings_customize_page(epoch, &data);
                             char *body     = buildPageWebSite(epoch, "{{SITE_NAME}} - Dashboard", content);
                             char *response = body ? build_epoch_response(body, "", epoch) : NULL;
                             free(body);
                             send_or_error(ctx, response, req.method, epoch);
+
+                            for (int i = 0; i < EPOCH_COUNT; i++) {
+                                free(data.banner[i]);
+                                free(data.footer[i]);
+                                free(data.home_blog_background[i]);
+                                free(data.home_blog_item_background[i]);
+                            }
+                            free(data.css_custom);
+                            free(data.css_original);
                         }
                     }
                 }
 
+            } else if (match_id_route(decoded_url, "/dashboard/settings/themes", "", id, sizeof(id))) {
+                // The old one-theme page: everything it held now lives in
+                // the customizer.
+                int epoch = resolve_epoch(&req);
+                char target[128];
+                snprintf(target, sizeof(target), "/dashboard/settings/themes/%s/customize",
+                         theme_key_is_valid(id) ? id : "");
+                char *response = build_redirect_response(theme_key_is_valid(id) ? target : "/dashboard/settings/themes",
+                                                          "", epoch);
+                send_or_error(ctx, response, req.method, epoch);
+
             } else if (strcmp(decoded_url, "/dashboard/api/theme-assets/list") == 0) {
                 int epoch = resolve_epoch(&req);
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     send_simple(ctx, "403 Forbidden", "Forbidden");
                 } else {
                     char user_id[USER_ID_HEX_BUF_SIZE];
@@ -1786,7 +2016,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (strcmp(decoded_url, "/dashboard/users") == 0) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1803,7 +2033,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (strcmp(decoded_url, "/dashboard/analytics") == 0) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1828,7 +2058,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (strcmp(decoded_url, "/dashboard/users/new") == 0) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1845,7 +2075,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (match_id_route(decoded_url, "/dashboard/users", "/edit", id, sizeof(id))) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1870,7 +2100,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (match_id_route(decoded_url, "/dashboard/entries", "/edit", id, sizeof(id))) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1911,7 +2141,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (strcmp(decoded_url, "/dashboard/media") == 0) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     char *response = build_redirect_response("/dashboard", "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 } else {
@@ -1934,7 +2164,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (strcmp(decoded_url, "/dashboard/api/media/contents") == 0) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     send_simple(ctx, "403 Forbidden", "Forbidden");
                 } else {
                     char user_id[USER_ID_HEX_BUF_SIZE];
@@ -1964,7 +2194,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (strcmp(decoded_url, "/dashboard/api/media/directory/item") == 0) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     send_simple(ctx, "403 Forbidden", "Forbidden");
                 } else {
                     char user_id[USER_ID_HEX_BUF_SIZE];
@@ -1991,7 +2221,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             } else if (strcmp(decoded_url, "/dashboard/api/media/modal") == 0) {
                 int epoch = resolve_epoch(&req);
 
-                if (epoch != EPOCH_MODERN) {
+                if (!dashboard_allowed(&req, epoch)) {
                     send_simple(ctx, "403 Forbidden", "Forbidden");
                 } else {
                     char user_id[USER_ID_HEX_BUF_SIZE];
@@ -2636,6 +2866,10 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                 }
 
             } else {
+                // Files keep their status line and headers even for a
+                // version-less request: Cello 1.x fetches images that way
+                // and needs Content-Type to show them (static_file_server.c).
+                ((connection_ctx_t *)ctx)->simple_response = 0;
                 const char *ims = get_header_value(&req, "If-Modified-Since");
                 int status = serve_static_file(ctx, root_directory, decoded_url, ims);
                 if (status != 0) {
@@ -2649,8 +2883,8 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
         } else if (strcmp(req.method, "POST") == 0 && strcmp(decoded_url, "/login") == 0) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
-                char *content  = login(epoch, NULL);
+            if (!dashboard_allowed(&req, epoch)) {
+                char *content  = login_unavailable(epoch);
                 char *body     = buildPageWebSite(epoch, "{{SITE_NAME}} - Login", content);
                 char *response = body ? build_epoch_response(body, "", epoch) : NULL;
                 free(body);
@@ -2719,7 +2953,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
         } else if (strcmp(req.method, "POST") == 0 && strcmp(decoded_url, "/dashboard/categories/new") == 0) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -2746,7 +2980,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                    match_id_route(decoded_url, "/dashboard/categories", "/edit", id, sizeof(id))) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -2773,7 +3007,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                    match_id_route(decoded_url, "/dashboard/categories", "/delete", id, sizeof(id))) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -2789,7 +3023,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
         } else if (strcmp(req.method, "POST") == 0 && strcmp(decoded_url, "/dashboard/menu/new") == 0) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -2819,7 +3053,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                    match_id_route(decoded_url, "/dashboard/menu", "/edit", id, sizeof(id))) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -2849,7 +3083,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                    match_id_route(decoded_url, "/dashboard/menu", "/delete", id, sizeof(id))) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -2870,7 +3104,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             // reader gets, so the editor never shows a second, drifting copy.
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 send_simple(ctx, "403 Forbidden", "Forbidden");
             } else {
                 char user_id[USER_ID_HEX_BUF_SIZE];
@@ -2912,7 +3146,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
         } else if (strcmp(req.method, "POST") == 0 && strcmp(decoded_url, "/dashboard/entries/new") == 0) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -2938,7 +3172,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                    match_id_route(decoded_url, "/dashboard/entries", "/delete", id, sizeof(id))) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -2955,7 +3189,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                    match_id_route(decoded_url, "/dashboard/api/entries", "/meta", id, sizeof(id))) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -3011,7 +3245,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                    match_id_route(decoded_url, "/dashboard/api/entries", "/header", id, sizeof(id))) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -3081,7 +3315,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                    match_id_route(decoded_url, "/dashboard/api/entries", "/content", id, sizeof(id))) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -3188,7 +3422,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                    match_block_delete_route(decoded_url, id, sizeof(id), block_id, sizeof(block_id))) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -3221,7 +3455,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                    match_id_route(decoded_url, "/dashboard/api/entries", "/blocks", id, sizeof(id))) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -3282,10 +3516,71 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                 }
             }
 
+        } else if (strcmp(req.method, "POST") == 0 &&
+                   (strcmp(decoded_url, "/dashboard/settings/favicon") == 0 ||
+                    strcmp(decoded_url, "/dashboard/settings/favicon/delete") == 0)) {
+            // The site favicons: multipart `epoch` (2/3) + `file` (.ico)
+            // uploads one, written to a temporary name and renamed over the
+            // old so a request never sees half a file; .../delete (field
+            // `epoch`) removes it, back to the theme's own <link>.
+            int epoch = resolve_epoch(&req);
+
+            if (!dashboard_allowed(&req, epoch)) {
+                char *response = build_redirect_response("/dashboard", "", epoch);
+                send_or_error(ctx, response, req.method, epoch);
+            } else {
+                char user_id[USER_ID_HEX_BUF_SIZE];
+                if (require_admin_session(ctx, &req, epoch, user_id)) {
+                    int is_delete = strcmp(decoded_url, "/dashboard/settings/favicon/delete") == 0;
+                    const char *error = NULL;
+                    char path[64];
+
+                    if (is_delete) {
+                        char target[4] = "";
+                        parse_urlencoded_field(req.body, req.body_length, "epoch", target, sizeof(target));
+                        if (page_layout_favicon_path(atoi(target), path, sizeof(path))) unlink(path);
+                    } else {
+                        const char *ct = get_header_value(&req, "Content-Type");
+                        MultipartResult *mp = parse_multipart(req.body, req.body_length, ct);
+                        const MultipartPart *epoch_part = mp ? multipart_find(mp, "epoch") : NULL;
+                        const MultipartPart *file_part = mp ? multipart_find(mp, "file") : NULL;
+
+                        int target = epoch_part && epoch_part->data_len == 1 ? epoch_part->data[0] - '0' : -9;
+                        if (!file_part || !page_layout_favicon_path(target, path, sizeof(path))) {
+                            error = "favicon-type";
+                        } else {
+                            error = favicon_ico_problem((const unsigned char *)file_part->data,
+                                                        file_part->data_len, target);
+                        }
+
+                        if (!error) {
+                            char tmp[80];
+                            snprintf(tmp, sizeof(tmp), "%s.tmp", path);
+                            FILE *f = fopen(tmp, "wb");
+                            int ok = f && fwrite(file_part->data, 1, file_part->data_len, f) == file_part->data_len;
+                            if (f && fclose(f) != 0) ok = 0;
+                            if (ok && rename(tmp, path) == 0) {
+                                LOG_INFO("Favicon saved: %s", path);
+                            } else {
+                                unlink(tmp);
+                                error = "favicon-write";
+                            }
+                        }
+                        free_multipart(mp);
+                    }
+
+                    char target_url[96];
+                    snprintf(target_url, sizeof(target_url), "/dashboard/settings%s%s",
+                             error ? "?error=" : "", error ? error : "");
+                    char *response = build_redirect_response(target_url, "", epoch);
+                    send_or_error(ctx, response, req.method, epoch);
+                }
+            }
+
         } else if (strcmp(req.method, "POST") == 0 && strcmp(decoded_url, "/dashboard/settings") == 0) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -3312,7 +3607,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                    match_id_route(decoded_url, "/dashboard/settings/themes", "/activate", id, sizeof(id))) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -3322,7 +3617,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                     // Back to the list or to this theme's page, whichever the
                     // button was on - nothing else is accepted as a target.
                     char theme_page[128], return_to[128];
-                    snprintf(theme_page, sizeof(theme_page), "/dashboard/settings/themes/%s", id);
+                    snprintf(theme_page, sizeof(theme_page), "/dashboard/settings/themes/%s/customize", id);
                     parse_urlencoded_field(req.body, req.body_length, "return", return_to, sizeof(return_to));
                     const char *target = strcmp(return_to, theme_page) == 0 ? theme_page : "/dashboard/settings/themes";
                     char *response = build_redirect_response(target, "", epoch);
@@ -3334,7 +3629,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                    match_id_route(decoded_url, "/dashboard/settings/themes", "/colors", id, sizeof(id))) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -3439,7 +3734,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                         cms_update_theme_colors(id, &colors);
                         cms_update_theme_logo_font(id, logo_font);
                         char redirect_to[128];
-                        snprintf(redirect_to, sizeof(redirect_to), "/dashboard/settings/themes/%s", id);
+                        snprintf(redirect_to, sizeof(redirect_to), "/dashboard/settings/themes/%s/customize", id);
                         char *response = build_redirect_response(redirect_to, "", epoch);
                         send_or_error(ctx, response, req.method, epoch);
                     }
@@ -3451,7 +3746,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                                             theme_epoch_str, sizeof(theme_epoch_str))) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -3473,11 +3768,61 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             }
 
         } else if (strcmp(req.method, "POST") == 0 &&
+                   match_theme_epoch_route(decoded_url, "home-blog", id, sizeof(id),
+                                            theme_epoch_str, sizeof(theme_epoch_str))) {
+            // The home blog's background images (epoch 2/3) - the list's
+            // ("background") and each item's ("item-background"): bare
+            // filenames the theme-assets widget uploaded to content/themes/
+            // <key>/home-blog/epoch<N>/, "" for the theme's own. Sanitized
+            // here with the upload's own rules, since page_layout.c/
+            // blog_list.c put them straight into a CSS url('...') / an HTML
+            // attribute. Epoch 2's panel also posts "item-background-color"
+            // ("1" when its checkbox is ticked, absent otherwise).
+            int epoch = resolve_epoch(&req);
+
+            if (!dashboard_allowed(&req, epoch)) {
+                char *response = build_redirect_response("/dashboard", "", epoch);
+                send_or_error(ctx, response, req.method, epoch);
+            } else {
+                char user_id[USER_ID_HEX_BUF_SIZE];
+                if (require_admin_session(ctx, &req, epoch, user_id)) {
+                    char raw[256], file[256] = "", raw_item[256], item_file[256] = "";
+                    parse_urlencoded_field(req.body, req.body_length, "background", raw, sizeof(raw));
+                    parse_urlencoded_field(req.body, req.body_length, "item-background",
+                                           raw_item, sizeof(raw_item));
+                    int target = atoi(theme_epoch_str);
+
+                    if (!theme_key_is_valid(id) || (target != EPOCH_MIDDLE && target != EPOCH_MODERN)) {
+                        send_error_response(ctx, 404, "404 Not Found", epoch);
+                    } else if ((raw[0] && !sanitize_asset_filename(raw, file, sizeof(file))) ||
+                               (raw_item[0] &&
+                                !sanitize_asset_filename(raw_item, item_file, sizeof(item_file)))) {
+                        send_simple(ctx, "400 Bad Request", "Invalid file name");
+                    } else {
+                        cms_update_theme_home_blog_background(id, target, file);
+                        cms_update_theme_home_blog_item_background(id, target, item_file);
+                        if (target == EPOCH_MIDDLE) {
+                            char show_color[4] = "";
+                            parse_urlencoded_field(req.body, req.body_length, "item-background-color",
+                                                   show_color, sizeof(show_color));
+                            cms_update_theme_home_blog_item_color_shown(id, target,
+                                                                        strcmp(show_color, "1") == 0);
+                        }
+                        char redirect_to[128];
+                        snprintf(redirect_to, sizeof(redirect_to),
+                                 "/dashboard/settings/themes/%s/customize", id);
+                        char *response = build_redirect_response(redirect_to, "", epoch);
+                        send_or_error(ctx, response, req.method, epoch);
+                    }
+                }
+            }
+
+        } else if (strcmp(req.method, "POST") == 0 &&
                    match_theme_epoch_route(decoded_url, "footer", id, sizeof(id),
                                             theme_epoch_str, sizeof(theme_epoch_str))) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -3503,7 +3848,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                                             theme_epoch_str, sizeof(theme_epoch_str))) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -3549,7 +3894,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                    match_theme_css_editor(decoded_url, "/restore", id, sizeof(id), &css_sheet)) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -3571,7 +3916,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                    match_theme_css_editor(decoded_url, "", id, sizeof(id), &css_sheet)) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -3595,7 +3940,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
         } else if (strcmp(req.method, "POST") == 0 && strcmp(decoded_url, "/dashboard/languages/add") == 0) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -3621,7 +3966,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                    match_id_route(decoded_url, "/dashboard/languages", "/default", id, sizeof(id))) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -3638,7 +3983,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                    match_id_route(decoded_url, "/dashboard/languages", "/remove", id, sizeof(id))) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -3660,7 +4005,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
         } else if (strcmp(req.method, "POST") == 0 && strcmp(decoded_url, "/dashboard/users/new") == 0) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -3688,7 +4033,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                    match_id_route(decoded_url, "/dashboard/users", "/edit", id, sizeof(id))) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -3722,7 +4067,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                    match_id_route(decoded_url, "/dashboard/users", "/delete", id, sizeof(id))) {
             int epoch = resolve_epoch(&req);
 
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -3761,7 +4106,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
         } else if (strcmp(req.method, "POST") == 0 &&
                    strcmp(decoded_url, "/dashboard/api/media/directory") == 0) {
             int epoch = resolve_epoch(&req);
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 send_simple(ctx, "403 Forbidden", "Forbidden");
             } else {
                 char user_id[USER_ID_HEX_BUF_SIZE];
@@ -3818,7 +4163,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
         } else if (strcmp(req.method, "POST") == 0 &&
                    strcmp(decoded_url, "/dashboard/api/media/directory/rename") == 0) {
             int epoch = resolve_epoch(&req);
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 send_simple(ctx, "403 Forbidden", "Forbidden");
             } else {
                 char user_id[USER_ID_HEX_BUF_SIZE];
@@ -3891,7 +4236,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
         } else if (strcmp(req.method, "POST") == 0 &&
                    strcmp(decoded_url, "/dashboard/api/media/directory/delete") == 0) {
             int epoch = resolve_epoch(&req);
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 send_simple(ctx, "403 Forbidden", "Forbidden");
             } else {
                 char user_id[USER_ID_HEX_BUF_SIZE];
@@ -3945,7 +4290,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
         } else if (strcmp(req.method, "POST") == 0 &&
                    strcmp(decoded_url, "/dashboard/api/media/delete") == 0) {
             int epoch = resolve_epoch(&req);
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 send_simple(ctx, "403 Forbidden", "Forbidden");
             } else {
                 char user_id[USER_ID_HEX_BUF_SIZE];
@@ -3984,7 +4329,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
         } else if (strcmp(req.method, "POST") == 0 &&
                    strcmp(decoded_url, "/dashboard/api/media/move") == 0) {
             int epoch = resolve_epoch(&req);
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 send_simple(ctx, "403 Forbidden", "Forbidden");
             } else {
                 char user_id[USER_ID_HEX_BUF_SIZE];
@@ -4037,7 +4382,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
         } else if (strcmp(req.method, "POST") == 0 &&
                    strcmp(decoded_url, "/dashboard/api/media/upload") == 0) {
             int epoch = resolve_epoch(&req);
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 send_simple(ctx, "403 Forbidden", "Forbidden");
             } else {
                 char user_id[USER_ID_HEX_BUF_SIZE];
@@ -4051,19 +4396,8 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                         const MultipartPart *dir_part = multipart_find(mp, "media-directory-selected");
                         const MultipartPart *file_part = multipart_find(mp, "file");
 
-                        // Sanitize filename
                         char sanitized[256] = {0};
-                        if (file_part) {
-                            int j = 0;
-                            for (int k = 0; file_part->filename[k] && j < (int)sizeof(sanitized) - 1; k++) {
-                                char c = file_part->filename[k];
-                                if (c == ' ') sanitized[j++] = '-';
-                                else if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-                                         (c >= '0' && c <= '9') || c == '-' || c == '.' || c == '_')
-                                    sanitized[j++] = c;
-                            }
-                            sanitized[j] = '\0';
-                        }
+                        if (file_part) media_sanitize_upload_name(file_part->filename, sanitized, sizeof(sanitized));
 
                         char dir_id_buf[32] = {0};
                         if (dir_part) {
@@ -4081,13 +4415,19 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                         CmsMediaDirectory dir;
                         int dir_found = cms_get_media_directory_by_id(dir_id_buf, &dir);
 
+                        // The content decides the format; the name only follows it.
+                        const char *image_ext = file_part
+                            ? media_image_extension((const unsigned char *)file_part->data, file_part->data_len)
+                            : NULL;
+
                         if (!file_part || file_part->filename[0] == '\0') {
                             send_simple(ctx, "400 Bad Request", "Missing file");
-                        } else if (!media_file_name_valid(sanitized) ||
-                                   !media_upload_is_allowed_image(sanitized,
-                                        (const unsigned char *)file_part->data, file_part->data_len)) {
+                        } else if (!image_ext) {
                             send_simple(ctx, "415 Unsupported Media Type",
                                         "Only JPEG, PNG, GIF and WebP images can be uploaded");
+                        } else if (!media_name_with_extension(sanitized, sizeof(sanitized), image_ext) ||
+                                   !media_file_name_valid(sanitized)) {
+                            send_simple(ctx, "400 Bad Request", "Invalid file name");
                         } else if (!media_username_valid(username)) {
                             LOG_WARN("media upload: unusable username '%s' for user %s", username, user_id);
                             send_simple(ctx, "400 Bad Request", "Your account name cannot be used as a media directory");
@@ -4106,10 +4446,22 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                             snprintf(dirpath, sizeof(dirpath), "./html/content/posts/%s/%s", username, dir.name);
                             mkdir(dirpath, 0775);
 
+                            if (!media_unique_name(dirpath, sanitized, sizeof(sanitized))) {
+                                send_simple(ctx, "409 Conflict", "Could not find a free name for this file");
+                                free_multipart(mp);
+                                goto cleanup;
+                            }
+
                             // Write file
                             char filepath[1024];
                             snprintf(filepath, sizeof(filepath), "%s/%s", dirpath, sanitized);
-                            FILE *f = fopen(filepath, "wb");
+                            // A new file only: O_EXCL fails on any existing name and
+                            // O_NOFOLLOW on a symlink, so an upload can never write
+                            // through an earlier upload's base-name link into its
+                            // _half variant, or over any other file.
+                            int fd = open(filepath, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0644);
+                            FILE *f = fd >= 0 ? fdopen(fd, "wb") : NULL;
+                            if (fd >= 0 && !f) close(fd);
                             int write_ok = 0;
                             if (f) {
                                 write_ok = fwrite(file_part->data, 1, file_part->data_len, f) == file_part->data_len;
@@ -4190,9 +4542,52 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
             }
 
         } else if (strcmp(req.method, "POST") == 0 &&
+                   (strcmp(decoded_url, "/dashboard/api/browsers/preview") == 0 ||
+                    strcmp(decoded_url, "/dashboard/api/browsers") == 0)) {
+            // The Browser detection page's JSON endpoints: a dry run of the
+            // edited rules, and saving them (browser_detection_admin.h).
+            int epoch = resolve_epoch(&req);
+            if (!dashboard_allowed(&req, epoch)) {
+                send_simple(ctx, "403 Forbidden", "Forbidden");
+            } else {
+                char user_id[USER_ID_HEX_BUF_SIZE];
+                if (require_admin_session(ctx, &req, epoch, user_id)) {
+                    const char *ua = get_header_value(&req, "User-Agent");
+                    const char *status = "500 Internal Server Error";
+                    char *json = strcmp(decoded_url, "/dashboard/api/browsers") == 0
+                        ? browser_detection_admin_save(req.body, (size_t)req.body_length, ua, user_id, &status)
+                        : browser_detection_admin_preview(req.body, (size_t)req.body_length, ua, &status);
+                    char *response = build_json_response_status(json ? json : "{\"error\":\"out of memory\"}",
+                                                                status);
+                    free(json);
+                    if (response) connection_write(ctx, response, strlen(response));
+                    free(response);
+                    connection_close(ctx);
+                }
+            }
+
+        } else if (strcmp(req.method, "POST") == 0 &&
+                   strcmp(decoded_url, "/dashboard/settings/browsers/reset") == 0) {
+            int epoch = resolve_epoch(&req);
+            if (!dashboard_allowed(&req, epoch)) {
+                char *response = build_redirect_response("/dashboard", "", epoch);
+                send_or_error(ctx, response, req.method, epoch);
+            } else {
+                char user_id[USER_ID_HEX_BUF_SIZE];
+                if (require_admin_session(ctx, &req, epoch, user_id)) {
+                    // The factory rules grant the dashboard to every browser
+                    // that can reach this page, so no lock-out check here.
+                    cms_browser_detection_reset();
+                    cms_browser_detection_reload();
+                    char *response = build_redirect_response("/dashboard/settings/browsers", "", epoch);
+                    send_or_error(ctx, response, req.method, epoch);
+                }
+            }
+
+        } else if (strcmp(req.method, "POST") == 0 &&
                    strcmp(decoded_url, "/dashboard/settings/fonts/upload") == 0) {
             int epoch = resolve_epoch(&req);
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -4269,7 +4664,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
         } else if (strcmp(req.method, "POST") == 0 &&
                    match_id_route(decoded_url, "/dashboard/settings/fonts", "/delete", id, sizeof(id))) {
             int epoch = resolve_epoch(&req);
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 char *response = build_redirect_response("/dashboard", "", epoch);
                 send_or_error(ctx, response, req.method, epoch);
             } else {
@@ -4290,7 +4685,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
         } else if (strcmp(req.method, "POST") == 0 &&
                    strcmp(decoded_url, "/dashboard/api/theme-assets/upload") == 0) {
             int epoch = resolve_epoch(&req);
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 send_simple(ctx, "403 Forbidden", "Forbidden");
             } else {
                 char user_id[USER_ID_HEX_BUF_SIZE];
@@ -4329,19 +4724,17 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                                 fclose(f);
                             }
 
-                            // Epoch -1 (WAP/WML) devices need WBMP - convert
-                            // the just-written PNG/JPEG in place and report
-                            // the .wbmp filename instead, so the logo form
-                            // never has to know a conversion happened.
-                            if (write_ok && is_epoch_neg1 && strcmp(component, "menu") == 0) {
+                            // Epoch -1 (WAP/WML): keep the PNG, write its
+                            // WBMP twin, and report the WBMP's name - the
+                            // one WML references (the logo form stores it;
+                            // the WAP preview swaps .wbmp for .png).
+                            if (write_ok && is_epoch_neg1) {
                                 char wbmp_name[256];
-                                snprintf(wbmp_name, sizeof(wbmp_name), "%.*s.wbmp",
-                                         (int)(sizeof(wbmp_name) - 6), sanitized);
                                 char wbmp_path[512];
-                                snprintf(wbmp_path, sizeof(wbmp_path), "%s/%s", dir, wbmp_name);
-
-                                if (image_convert_to_wbmp(filepath, wbmp_path, 200) == 0) {
-                                    remove(filepath);
+                                if (wap_twin_name(sanitized, ".wbmp", wbmp_name, sizeof(wbmp_name)) &&
+                                    snprintf(wbmp_path, sizeof(wbmp_path), "%s/%s", dir, wbmp_name) <
+                                        (int)sizeof(wbmp_path) &&
+                                    image_convert_to_wbmp(filepath, wbmp_path, 200) == 0) {
                                     strncpy(sanitized, wbmp_name, sizeof(sanitized) - 1);
                                     sanitized[sizeof(sanitized) - 1] = '\0';
                                 } else {
@@ -4373,7 +4766,7 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
         } else if (strcmp(req.method, "POST") == 0 &&
                    strcmp(decoded_url, "/dashboard/api/theme-assets/delete") == 0) {
             int epoch = resolve_epoch(&req);
-            if (epoch != EPOCH_MODERN) {
+            if (!dashboard_allowed(&req, epoch)) {
                 send_simple(ctx, "403 Forbidden", "Forbidden");
             } else {
                 char user_id[USER_ID_HEX_BUF_SIZE];
@@ -4393,6 +4786,16 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                         char filepath[512];
                         snprintf(filepath, sizeof(filepath), "%s/%s", dir, sanitized);
                         unlink(filepath);
+
+                        // Epoch -1 images come in pairs: either one takes the other along.
+                        char twin[256];
+                        const char *twin_ext = has_extension_ci(sanitized, ".wbmp") ? ".png"
+                                             : has_extension_ci(sanitized, ".png") ? ".wbmp" : NULL;
+                        if (strcmp(epoch_str, "-1") == 0 && twin_ext &&
+                            wap_twin_name(sanitized, twin_ext, twin, sizeof(twin))) {
+                            snprintf(filepath, sizeof(filepath), "%s/%s", dir, twin);
+                            unlink(filepath);
+                        }
                         send_simple(ctx, "200 OK", "Deleted");
                     }
                 }

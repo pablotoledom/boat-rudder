@@ -61,7 +61,8 @@ loop until header block complete
     CONN --> RH : bytes (0 = EOF, < 0 = error)
     note right of RH
       complete on "\r\n\r\n" / "\n\n",
-      on an HTTP/0.9 line,
+      on an HTTP/0.9 line (no headers too:
+      pages sent as a Simple-Response),
       or after a 400 ms quiet poll()
       for a versioned line w/o terminator;
       32 KiB full → 431
@@ -105,6 +106,7 @@ else
           ?lang / ?theme link tagging,
           WML pagination (860 B),
           Latin-1 for epoch 1, WML, Cello,
+          Line Mode, HTTP/0.9,
           Content-Type + security headers
         end note
         RESP --> RH : response

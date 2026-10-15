@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 // Replaces `marker` with the contents of layout/<part>_epoch<N>.html. A part
 // that has no file for this epoch resolves to nothing, which is how the retro
@@ -105,8 +106,13 @@ static char *splice_footer_logo(char *html, int epoch) {
         char encoded_alt[512];
         html_encode(encoded_alt, site_name ? site_name : "", sizeof(encoded_alt));
         free(site_name);
-        img = render_template("<img src=\"/themes/%s/assets/menu/epoch%d/%s\" alt=\"%s\">",
-                               request_theme(), epoch, cfg.footer_image, encoded_alt);
+        // WML is XML: its <img> must close itself, or the deck is invalid.
+        // Epoch 1/2 browsers draw a link border around an image unless told
+        // not to (WML has no border attribute at all).
+        img = render_template("<img src=\"/content/themes/%s/logo/epoch%d/%s\" alt=\"%s\"%s%s>",
+                               request_theme(), epoch, cfg.footer_image, encoded_alt,
+                               epoch == EPOCH_EARLY || epoch == EPOCH_MIDDLE ? " border=\"0\"" : "",
+                               epoch == EPOCH_WML ? "/" : "");
     } else if (epoch == EPOCH_PRESTANDARD) {
         char *site_name = cms_get_site_name();
         const char *text = cfg.text[0] ? cfg.text : (site_name ? site_name : "");
@@ -197,6 +203,27 @@ static char *splice_theme_colors(char *html) {
         : cms_get_theme_logo_font(request_theme());
     char *font_css = build_logo_font_css(logo_font);
     free(logo_font);
+
+    // The home blog's background images - the list's and each item's - if
+    // the theme customizer set them: filenames the home-blog POST route
+    // already sanitized, so they can sit inside url('...') as they are.
+    // After the stylesheet's own rules, so they win; an item's image is
+    // drawn over its background color.
+    static const struct { const char *selector; char *(*get)(const char *, int); } BLOG_IMAGES[] = {
+        { ".boat-rudder-home-blog",      cms_get_theme_home_blog_background },
+        { ".boat-rudder-home-blog-item", cms_get_theme_home_blog_item_background },
+    };
+    for (size_t i = 0; font_css && i < sizeof(BLOG_IMAGES) / sizeof(BLOG_IMAGES[0]); i++) {
+        char *file = BLOG_IMAGES[i].get(request_theme(), EPOCH_MODERN);
+        if (file && file[0]) {
+            char *rule = render_template(
+                "%s{background-image:url('/content/themes/%s/home-blog/epoch3/%s');}",
+                BLOG_IMAGES[i].selector, request_theme(), file);
+            font_css = rule ? str_append(font_css, rule) : font_css;
+            free(rule);
+        }
+        free(file);
+    }
 
     char *style = render_template(
         "<style>:root{"
@@ -419,8 +446,127 @@ static char *splice_admin_styles(char *html, int epoch) {
     return result;
 }
 
-char *page_layout_wrap(char *fragment_html, const char *page_title, int epoch,
-                       const char *body_background) {
+// ---- Favicons ----------------------------------------------------------------
+//
+// The site's own favicons, uploaded from /dashboard/settings - favicon2.ico
+// for epoch 2, favicon3.ico for epoch 3, in the static root. When one exists
+// it takes over the href of the layout's favicon <link> (or a <link> is added
+// when the layout has none); otherwise the theme's own link is left as it is,
+// so the defaults stay in the layouts, not here.
+
+int page_layout_favicon_path(int epoch, char *out, size_t out_size) {
+    if (epoch != EPOCH_MIDDLE && epoch != EPOCH_MODERN) return 0;
+    int n = snprintf(out, out_size, "./html/favicon%d.ico", epoch);
+    return n > 0 && (size_t)n < out_size;
+}
+
+// "/favicon<N>.ico?v=<mtime>" when the uploaded file exists - the version
+// makes browsers, which cache favicons hard, fetch a replaced one.
+static int favicon_custom_url(int epoch, char *out, size_t out_size) {
+    char path[64];
+    struct stat st;
+    if (!page_layout_favicon_path(epoch, path, sizeof(path)) ||
+        stat(path, &st) != 0 || !S_ISREG(st.st_mode))
+        return 0;
+    int n = snprintf(out, out_size, "/favicon%d.ico?v=%lld", epoch, (long long)st.st_mtime);
+    return n > 0 && (size_t)n < out_size;
+}
+
+// The href value of the first <link rel="icon"> / <link rel="shortcut icon">
+// in `html`'s <head>: returns its start and sets *value_end to its closing
+// quote, or returns NULL.
+static char *find_favicon_href(char *html, char **value_end) {
+    char *head_end = strstr(html, "</head>");
+    for (char *link = strstr(html, "<link"); link && (!head_end || link < head_end);
+         link = strstr(link + 5, "<link")) {
+        char *tag_end = strchr(link, '>');
+        if (!tag_end) return NULL;
+
+        size_t len = (size_t)(tag_end - link);
+        char tag[512];
+        if (len >= sizeof(tag)) continue;
+        memcpy(tag, link, len);
+        tag[len] = '\0';
+        if (!strstr(tag, "rel=\"icon\"") && !strstr(tag, "rel=\"shortcut icon\"")) continue;
+
+        char *href = strstr(tag, "href=\"");
+        if (!href) continue;
+        char *value = link + (href - tag) + 6;
+        char *end = strchr(value, '"');
+        if (!end || end > tag_end) continue;
+        *value_end = end;
+        return value;
+    }
+    return NULL;
+}
+
+static char *splice_favicon(char *html, int epoch) {
+    char url[64];
+    if (!html || !favicon_custom_url(epoch, url, sizeof(url))) return html;
+
+    char *end = NULL;
+    char *value = find_favicon_href(html, &end);
+    char *result = NULL;
+    if (value) {
+        size_t head = (size_t)(value - html), url_len = strlen(url), tail = strlen(end);
+        result = malloc(head + url_len + tail + 1);
+        if (result) {
+            memcpy(result, html, head);
+            memcpy(result + head, url, url_len);
+            memcpy(result + head + url_len, end, tail + 1);
+        }
+    } else if (strstr(html, "</head>")) {
+        char tag[128];
+        snprintf(tag, sizeof(tag), "<link rel=\"%s\" href=\"%s\">\n</head>",
+                 epoch == EPOCH_MIDDLE ? "shortcut icon" : "icon", url);
+        result = str_replace_first(html, "</head>", tag);
+    } else {
+        return html;
+    }
+    free(html);
+    return result;
+}
+
+char *page_layout_favicon_url(int epoch, int *is_custom) {
+    char url[64];
+    if (is_custom) *is_custom = 0;
+    if (favicon_custom_url(epoch, url, sizeof(url))) {
+        if (is_custom) *is_custom = 1;
+        return strdup(url);
+    }
+
+    char *path = generate_url_theme("layout/layout_epoch%d.html", epoch);
+    char *layout = path ? read_file_to_string(path) : NULL;
+    free(path);
+    if (!layout) return NULL;
+
+    char *end = NULL;
+    char *value = find_favicon_href(layout, &end);
+    char *result = value ? strndup(value, (size_t)(end - value)) : NULL;
+    free(layout);
+    return result;
+}
+
+// {{BODY_BACKDROP}}: unlike the other markers, what it asks for is not
+// spliced where it stands - it is the <body>'s attributes, which live in the
+// layout - so it is removed from `*fragment` and the theme's
+// layout/body-backdrop_epoch<N>.html is returned for {{BODY_BACKGROUND}}.
+// "" without the marker or the file; NULL only on allocation failure.
+static char *take_body_backdrop(char **fragment, int epoch) {
+    if (!strstr(*fragment, "{{BODY_BACKDROP}}")) return strdup("");
+
+    char *without = str_replace_first(*fragment, "{{BODY_BACKDROP}}", "");
+    if (!without) return NULL;
+    free(*fragment);
+    *fragment = without;
+
+    char *path = generate_url_theme("layout/body-backdrop_epoch%d.html", epoch);
+    char *backdrop = path ? read_file_to_string(path) : NULL;
+    free(path);
+    return backdrop ? backdrop : strdup("");
+}
+
+char *page_layout_wrap(char *fragment_html, const char *page_title, int epoch) {
     if (!fragment_html) return NULL;
 
     fragment_html = splice_footer(fragment_html, epoch);
@@ -459,8 +605,9 @@ char *page_layout_wrap(char *fragment_html, const char *page_title, int epoch,
         return NULL;
     }
 
-    char *with_bg = str_replace_first(titled, "{{BODY_BACKGROUND}}",
-                                      body_background ? body_background : "");
+    char *backdrop = take_body_backdrop(&fragment_html, epoch);
+    char *with_bg = backdrop ? str_replace_first(titled, "{{BODY_BACKGROUND}}", backdrop) : NULL;
+    free(backdrop);
     free(titled);
     if (!with_bg) {
         free(fragment_html);
@@ -481,6 +628,7 @@ char *page_layout_wrap(char *fragment_html, const char *page_title, int epoch,
 
     with_colors = splice_admin_styles(with_colors, epoch);
     if (with_colors) with_colors = splice_csrf_token(with_colors, epoch);
+    if (with_colors) with_colors = splice_favicon(with_colors, epoch);
     if (!with_colors) {
         free(fragment_html);
         return NULL;

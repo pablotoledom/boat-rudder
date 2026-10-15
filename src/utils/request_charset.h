@@ -19,10 +19,13 @@
 // forced/previewed epoch 0 is for previewing epoch 0 in whatever browser is
 // doing the previewing, not for emulating Cello specifically.
 
-// Resolves whether `user_agent` belongs to a browser needing this, and
-// stores it for request_needs_legacy_charset(). Call once per request,
-// alongside request_lang_set()/request_theme_set() in http_router.c.
-void request_charset_set(const char *user_agent);
+// Resolves whether `user_agent` belongs to a browser needing this - Cello,
+// the CERN Line Mode Browser ("LineMode/", "W3CLineMode/"), or any HTTP/0.9
+// client (`http09`: a version-less request with no headers, from before
+// UTF-8 existed) - and stores it for request_needs_legacy_charset(). Call
+// once per request, alongside request_lang_set()/request_theme_set() in
+// http_router.c.
+void request_charset_set(const char *user_agent, int http09);
 
 // True if the last request_charset_set() on this thread found a genuinely
 // pre-Unicode browser. False (including before any request_charset_set()

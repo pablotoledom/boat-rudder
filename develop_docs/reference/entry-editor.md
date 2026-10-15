@@ -3,7 +3,7 @@
 An AJAX content editor for one `entries` document - meta (link/type/enabled/categories),
 header (cover image, date, per-language title/summary, read-only author) and `content[]` blocks
 - with live preview, drag-and-drop reordering, rich-text editing, and optional autosave.
-**`EPOCH_MODERN` only**, session-guarded via `require_dashboard_session_role()`.
+**`EPOCH_MODERN` only** (with the rules' dashboard flag - see [dashboard.md](dashboard.md#routes)), session-guarded via `require_dashboard_session_role()`.
 
 Diagrams: [entry-editor-components.puml](../diagrams/entry-editor-components.puml),
 [sequence-entry-editor-edit-route.puml](../diagrams/sequence-entry-editor-edit-route.puml),
@@ -121,7 +121,7 @@ always reachable.
 The body shows the picture rather than its path, because opening a block hides the collapsed
 preview (`.block--editing .block__preview { display: none }`) and reveals the body. Layout:
 
-- **Header**: a `Select photo` button, next to the same-styled `Select photos` of `gallery`,
+- **Header**: a `Select photo` button, next to the same-styled `Add photos` of `gallery`,
   so a picture can be swapped without opening the block.
 - **Body**: the image itself (`renderImagePreview()`, requesting `_small`), then
   `Caption / alt text`, then `Size` (100/50/30 %) and `Alignment` (left/center/right, or
@@ -204,10 +204,18 @@ The merge button is enabled only when the block above is also a paragraph
 `setHeadingLevel(btn, level)` - updates `extra_data`, refreshes preview.
 
 ### Gallery blocks
-- `initGalleryBlock(block)` - reads the first lang's text field (semicolon URLs) and calls `renderGalleryThumbs()`.
-- `renderGalleryThumbs(container, value)` - renders 56×56 px `<img class="boat-rudder-entry-editor__gallery-thumb">` draggable thumbnails using `_small` variant URLs.
-- `initGalleryThumbDragDrop(container)` - HTML5 drag-and-drop to reorder thumbnails; on drop calls `syncGalleryInput()`.
-- `syncGalleryInput(container)` - writes reordered URLs back to all lang text fields.
+The open block shows its photos as numbered tiles (`.boat-rudder-entry-editor-gallery`), in
+gallery order, each with ← / → (move one place; disabled at the ends) and × (remove from the
+gallery), plus a last **+ Add photos** tile. A tile can also be dragged to a new place. The
+arrows are what work on touch screens and from the keyboard, where HTML5 drag-and-drop doesn't.
+
+- `initGalleryBlock(block)` - reads the current language's text field (semicolon URLs) and calls `renderGalleryThumbs()`.
+- `renderGalleryThumbs(container, value)` - renders the tiles (`_small` variant thumbnails) and the add tile. Its click
+  and drag listeners are attached to the container once (`data-gallery-ready`), so re-rendering never stacks them.
+- `initGalleryTiles(container)` - one delegated `click` handler for `data-gallery-action` = `earlier`/`later`/`remove`/`add`,
+  and the drag handlers (`dragstart`/`dragover` move the tile live, `dragend` saves the order).
+- `syncGalleryInput(container)` - writes the tiles' order back to every language's text field, re-renders the tiles
+  (numbers and arrows), refreshes the block preview and marks the entry changed.
 - `openGalleryForBlock(btn)` / `openImageGallery(btn)` - fetch `/dashboard/api/media/modal`, inject into `#modalContainer`, execute inline scripts so `selectDirectory`, `upload`, etc. work.
 
 ### Save functions
@@ -273,6 +281,8 @@ creates or updates a `media_galleries` document (BSON array of URLs) and writes 
 The media picker modal (`/dashboard/api/media/modal`) returns the full
 `dashboard/media/media_epoch3.html` wrapped in `.boat-rudder-modal`. Its inline JS sets selected
 URLs into the target block's text fields (gallery) or the header `image_url` input (header cover).
+For a gallery the picked photos are **appended** after the ones it already has, in the order they
+were picked, skipping any it already has - removing and reordering happen in the block itself.
 `activateScripts(container)` re-executes all `<script>` tags after `innerHTML` injection so that
 `selectDirectory`, `upload`, and other media functions are available.
 

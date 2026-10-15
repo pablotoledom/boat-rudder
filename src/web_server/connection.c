@@ -7,9 +7,28 @@
 #include <string.h>
 #include <sys/socket.h>
 
+static ssize_t raw_write(connection_ctx_t *conn, const char *buf, size_t count);
+
 ssize_t connection_write(void *ctx, const char *buf, size_t count) {
     connection_ctx_t *conn = (connection_ctx_t *)ctx;
     if (!conn) return -1;
+
+    if (conn->simple_response && conn->header_end_matched < 4) {
+        static const char END[] = "\r\n\r\n";
+        size_t i = 0;
+        while (i < count && conn->header_end_matched < 4) {
+            if (buf[i] == END[conn->header_end_matched]) conn->header_end_matched++;
+            else conn->header_end_matched = (buf[i] == '\r') ? 1 : 0;
+            i++;
+        }
+        if (i == count) return (ssize_t)count;      // all of it was header
+        ssize_t sent = raw_write(conn, buf + i, count - i);
+        return sent > 0 ? (ssize_t)i + sent : sent;
+    }
+    return raw_write(conn, buf, count);
+}
+
+static ssize_t raw_write(connection_ctx_t *conn, const char *buf, size_t count) {
 
     if (conn->ssl) {
         int ret = SSL_write(conn->ssl, buf, (int)count);

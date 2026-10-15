@@ -124,7 +124,7 @@ note right of RESP
   Content-Type by epoch:
   -1     -> text/vnd.wap.wml
   0      -> text/html; charset=UTF-8
-            (bare text/html for Cello)
+            (bare text/html for Cello, Line Mode, HTTP/0.9)
   1      -> text/html
   2, 3   -> text/html; charset=UTF-8
   + SECURITY_HEADERS

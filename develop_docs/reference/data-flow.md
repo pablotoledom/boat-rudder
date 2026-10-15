@@ -154,6 +154,8 @@ http_route(read_func, ctx, root_directory)
   ├─ READ LOOP until the header block is complete:
   │     "\r\n\r\n" or "\n\n"                      → done
   │     request line without version (HTTP/0.9)   → done immediately
+  │       (+ no headers at all: ctx->simple_response = 1 - pages go out
+  │        without status line/headers; cleared for static files)
   │     versioned line, no terminator, plain HTTP → wait ≤ 400 ms for more, else done
   │     buffer full → 431;  EOF / error → cleanup
   │
@@ -176,7 +178,8 @@ http_route(read_func, ctx, root_directory)
   │     request_user_set(Cookie)                session → users.name (navbar)
   │     request_theme_set(Cookie, ?theme=)      ?theme= → theme cookie →
   │                                             site_settings.active_theme → config `theme`
-  │     request_charset_set(User-Agent)         real browser needs Latin-1? (Cello)
+  │     request_charset_set(User-Agent, http09) real browser needs Latin-1?
+  │                                             (Cello, LineMode, HTTP/0.9)
   │     request_code_lines_set(?code_lines=)
   │     request_wml_set(raw url, ?wml_pages=)
   │     content_lang = request_lang()
@@ -199,7 +202,8 @@ http_route(read_func, ctx, root_directory)
   │     OPTIONS → 204;  other method → 405
   │
   │     Every dynamic route resolves its epoch via resolve_epoch(req):
-  │       force_epoch (if -1..3) → ?preview_epoch=N (if -1..3) → detect_epoch(User-Agent)
+  │       force_epoch (if -1..3) → ?preview_epoch=N (if -1..3) → HTTP/0.9 → 0
+  │       → detect_epoch(User-Agent)   (the browser detection rules, in memory)
   │     and wraps its content with one of the html_builder/orchestrator.c page builders.
   │
   │     Any non-2xx/3xx response (400/403/404/405/413/431/500/503) is rendered
@@ -217,7 +221,7 @@ http_route(read_func, ctx, root_directory)
 GET/HEAD "/"  (http_router.c)
   │
   ├─ epoch = resolve_epoch(req)
-  │     force_epoch (if -1..3) → ?preview_epoch=N → detect_epoch(User-Agent)
+  │     force_epoch (if -1..3) → ?preview_epoch=N → HTTP/0.9 → 0 → detect_epoch(User-Agent)
   │     -1 = WML, 0 = pre-standard, 1 = early, 2 = middle, 3 = modern
   │
   ├─ body = buildHomeWebSite(epoch, lang)         ── html_builder/orchestrator.c
@@ -273,7 +277,7 @@ GET/HEAD "/"  (http_router.c)
   │       epochs -1/1, and 0 when request_needs_legacy_charset(): UTF-8 → Latin-1
   │     Content-Type by epoch:
   │       -1 → text/vnd.wap.wml
-  │        0 → text/html; charset=UTF-8   (bare text/html for Cello)
+  │        0 → text/html; charset=UTF-8   (bare text/html for Cello, LineMode, HTTP/0.9)
   │        1 → text/html                  (no charset: Mosaic matches it literally)
   │      2,3 → text/html; charset=UTF-8
   │     + SECURITY_HEADERS (X-Content-Type-Options, X-Frame-Options)
@@ -296,7 +300,9 @@ route so it can come from the database.
 ## 5b. Login, Dashboard and Logout Routes
 
 All four routes share `epoch = resolve_epoch(req)` (`force_epoch` override, else
-`?preview_epoch=`, else `detect_epoch(User-Agent)`) and the generic `page_epoch<N>.html` shell via
+`?preview_epoch=`, else epoch 0 for HTTP/0.9, else `detect_epoch(User-Agent)`), gate on
+`dashboard_allowed()` (epoch 3 **and** the rules' `dashboard` flag for the real `User-Agent`), and
+use the generic `page_epoch<N>.html` shell via
 `buildPageWebSite(epoch, title, content)` (head + menu + `%s` content + footer).
 
 ```

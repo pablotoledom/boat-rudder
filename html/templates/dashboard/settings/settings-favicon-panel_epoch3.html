@@ -1,0 +1,25 @@
+    <div class="boat-rudder-dashboard__favicon boat-rudder-card">
+      <div class="boat-rudder-dashboard__favicon-preview">
+        <img src="%4$s" alt="" width="32" height="32"%5$s>
+      </div>
+      <div class="boat-rudder-dashboard__favicon-body">
+        <strong>%2$s</strong>
+        <span class="boat-rudder-dashboard__favicon-status">%6$s</span>
+        <p class="boat-rudder-dashboard__favicon-hint">%3$s</p>
+        <div class="boat-rudder-dashboard__inline-form">
+          <form method="POST" action="/dashboard/settings/favicon" enctype="multipart/form-data">
+            <input type="hidden" name="epoch" value="%1$s">
+            <label class="boat-rudder-btn boat-rudder-btn--sm">
+              Upload .ico
+              <input type="file" name="file" accept=".ico,image/x-icon,image/vnd.microsoft.icon" hidden
+                     onchange="if (this.files.length) this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit();">
+            </label>
+          </form>
+          <form method="POST" action="/dashboard/settings/favicon/delete"%7$s
+                onsubmit="return confirm('Remove the uploaded favicon? The theme\'s own is used again.');">
+            <input type="hidden" name="epoch" value="%1$s">
+            <button class="boat-rudder-btn boat-rudder-btn--sm" type="submit">Use the theme's</button>
+          </form>
+        </div>
+      </div>
+    </div>

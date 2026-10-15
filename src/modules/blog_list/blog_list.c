@@ -17,7 +17,10 @@ static char *load_template(const char *subpath_fmt, int epoch) {
     return tpl;
 }
 
-static char *render_item(const CmsBlogListItem *item, const char *item_tpl, int epoch) {
+// `show_item_color` only matters on epoch 2: false drops the item <table>'s
+// bgcolor (see cms_get_theme_home_blog_item_color_shown()).
+static char *render_item(const CmsBlogListItem *item, const char *item_tpl, int epoch,
+                         bool show_item_color) {
     char *categories_html = category_tags_render_list(item->category_links, item->category_names,
                                                        item->category_count, epoch);
     if (!categories_html) return NULL;
@@ -74,6 +77,11 @@ static char *render_item(const CmsBlogListItem *item, const char *item_tpl, int 
             // replacing the item card's own background GIF, which Netscape
             // 4 redraws slowly and which repeated once per item (up to
             // HOME_BLOG_LIMIT of them) on the home page compounded that.
+            // Under an item background image (set_table_background()), the
+            // image paints over this color; where the image is transparent
+            // the color shows, unless the theme hides it - then the
+            // attribute is dropped below rather than left empty, which some
+            // browsers of the era read as black.
             char item_bg[8];
             int unused_alpha;
             cms_split_hex_alpha(retro.blog_list_item_background, item_bg, &unused_alpha);
@@ -85,8 +93,13 @@ static char *render_item(const CmsBlogListItem *item, const char *item_tpl, int 
                                    item->header_hide_author ? "" : item->header_author,
                                    categories_html,
                                    retro.blog_list_item_date, item->header_date,
-                                   retro.blog_list_item_border, item_bg)
+                                   retro.blog_list_item_border, show_item_color ? item_bg : "")
                 : NULL;
+            if (result && !show_item_color) {
+                char *stripped = str_replace_first(result, " bgcolor=\"\"", "");
+                free(result);
+                result = stripped;
+            }
         }
         free(thumb);
         free(link_url);
@@ -108,6 +121,53 @@ static char *render_item(const CmsBlogListItem *item, const char *item_tpl, int 
 
     free(categories_html);
     return result;
+}
+
+// Epoch 2's home blog list and each of its items are a <table> (the theme's
+// home-blog_epoch2.html / home-blog-item_epoch2.html). A background image
+// set in the theme customizer goes into the first table's background="..."
+// - replacing the template's own value, or added to it when it has none -
+// so a theme without the setting, or an updated template, renders exactly
+// as shipped. Takes ownership of `html`; NULL only on allocation failure.
+static char *set_table_background(char *html, const char *url) {
+    static const char ATTR[] = " background=\"";
+    char *value = strstr(html, ATTR);
+    char *end = value ? strchr(value + sizeof(ATTR) - 1, '"') : NULL;
+    char *insert_at;
+    const char *piece;
+    char *attr = NULL;
+
+    if (end) {
+        insert_at = value + sizeof(ATTR) - 1;   // replace [insert_at, end)
+        piece = url;
+    } else {
+        char *table = strstr(html, "<table");
+        if (!table) return html;
+        insert_at = end = table + 6;            // insert right after "<table"
+        attr = render_template(" background=\"%s\"", url);
+        if (!attr) return html;
+        piece = attr;
+    }
+
+    size_t head = (size_t)(insert_at - html), piece_len = strlen(piece), tail = strlen(end);
+    char *out = malloc(head + piece_len + tail + 1);
+    if (out) {
+        memcpy(out, html, head);
+        memcpy(out + head, piece, piece_len);
+        memcpy(out + head + piece_len, end, tail + 1);
+    }
+    free(attr);
+    free(html);
+    return out;
+}
+
+// The URL of an epoch 2 home blog image (`file`, as stored), NULL when unset.
+static char *epoch2_image_url(char *file) {
+    char *url = file && file[0]
+        ? render_template("/content/themes/%s/home-blog/epoch2/%s", request_theme(), file)
+        : NULL;
+    free(file);
+    return url;
 }
 
 // The one implementation. `heading` is printed above the list; `limit` caps
@@ -150,18 +210,29 @@ static char *render_list(int epoch, const char *lang, const char *heading,
                                           : empty_tpl;
         if (needs_color) free(empty_tpl);
     } else {
+        char *item_bg = epoch == EPOCH_MIDDLE
+            ? epoch2_image_url(cms_get_theme_home_blog_item_background(request_theme(), EPOCH_MIDDLE))
+            : NULL;
+        bool show_item_color = cms_get_theme_home_blog_item_color_shown(request_theme(), epoch);
         items = strdup("");
         for (size_t i = 0; items && i < entry_count; i++) {
-            char *item = render_item(&entries[i], item_tpl, epoch);
+            char *item = render_item(&entries[i], item_tpl, epoch, show_item_color);
+            if (item && item_bg) item = set_table_background(item, item_bg);
             items = item ? str_append(items, item) : NULL;
             free(item);
         }
+        free(item_bg);
     }
 
     if (items) {
         result = needs_color
             ? render_template(content_tpl, colors.home_content_text, heading, items)
             : render_template(content_tpl, heading, items);
+    }
+    if (result && epoch == EPOCH_MIDDLE) {
+        char *list_bg = epoch2_image_url(cms_get_theme_home_blog_background(request_theme(), EPOCH_MIDDLE));
+        if (list_bg) result = set_table_background(result, list_bg);
+        free(list_bg);
     }
 
 cleanup:

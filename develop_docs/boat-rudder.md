@@ -2,8 +2,9 @@
 
 **Boat Rudder** is a self-contained HTTP/HTTPS server, written in **C17**, that doubles as a
 **retro-compatible CMS**: every dynamic page (`/`, `/blog`, `/page/<link>`, …) is rendered on
-the fly into the simplest markup the requesting browser can understand - from 1999-era WAP phones
-to modern HTML5/CSS3 browsers - while every other path (`/assets/...`, `/content/...`,
+the fly into the simplest markup the requesting browser can understand - from the first web
+browsers of 1991 (HTTP/0.9, plain text), through the Mosaic and Netscape years and WAP phones, to
+modern HTML5/CSS3 browsers - while every other path (`/assets/...`, `/content/...`,
 `/favicon.ico`, ...) is served as a plain static file. An optional built-in **WAP 1.x gateway**
 lets real vintage phones reach the site over UDP, and a cookie-less **analytics** module counts
 visits per epoch, browser, OS and country.
@@ -22,6 +23,7 @@ illustrated with diagrams. For deeper detail see:
 
 - [reference/architecture.md](reference/architecture.md) - the server foundation, plus a map of
   every other document.
+- [reference/epochs.md](reference/epochs.md) - each epoch's technical specification: protocol, encoding, HTML, CSS and JS level, and the browsers sent to it.
 - [reference/rendering.md](reference/rendering.md) - epochs, templates, the response layer and every public page.
 - [reference/routes.md](reference/routes.md) - every route, its guard and handler.
 - [reference/data-model.md](reference/data-model.md) - every MongoDB collection.
@@ -35,7 +37,7 @@ illustrated with diagrams. For deeper detail see:
 - [reference/configuration.md](reference/configuration.md) - every `configs/settings.conf` key.
 - [reference/security.md](reference/security.md) - every defense and the known gaps.
 - [reference/data-flow.md](reference/data-flow.md) - step-by-step data flow, including the dynamic `/` route.
-- [reference/scripts.md](reference/scripts.md) and [reference/migrations.md](reference/migrations.md) - build, run, deployment and data migrations.
+- [reference/scripts.md](reference/scripts.md) - build, run and deployment.
 - [reference/third-party.md](reference/third-party.md) - vendored, ported and linked code.
 - [reference/style-guide.md](reference/style-guide.md) - C conventions and security rules.
 - [../CHANGELOG.md](../CHANGELOG.md) - what changed, by version.
@@ -83,9 +85,11 @@ logging infrastructure:
 
 ### 2.1 Why "retro-compatible"?
 
-The web has accumulated 30+ years of browsers with wildly different capabilities: WAP phones
-that only understand WML, text browsers like Lynx, browsers from the mid-90s with no CSS or JS,
-late-90s/2000s browsers with basic CSS1, and today's HTML5/CSS3/JS browsers.
+The web has accumulated 35 years of browsers with wildly different capabilities: the first
+browsers of 1991, which read text over HTTP/0.9 (and text browsers like Lynx, still in use), the
+mid-90s browsers with tables but no CSS or JS, the late-90s/2000s browsers with basic CSS1, WAP
+phones that only understand WML, and today's HTML5/CSS3/JS browsers. Each epoch's exact
+specification is in [reference/epochs.md](reference/epochs.md).
 
 Instead of sending one "lowest common denominator" page to everyone (or breaking on old
 browsers), Boat Rudder classifies every incoming request into an **epoch** and serves a page
@@ -98,11 +102,11 @@ epochs:
 
 | Epoch | Constant | Era / target browsers | `Content-Type` | Markup style |
 |---|---|---|---|---|
-| `-1` | `EPOCH_WML` | WAP 1.x phones (Nokia, Openwave/UP.Browser, Obigo, and manufacturer-prefix firmware - SIE-, SEC-, MOT-, LG-, Ericsson, Panasonic, SANYO, SHARP, Alcatel, PHILIPS) | `text/vnd.wap.wml` over HTTP; compiled **WBXML** (`application/vnd.wap.wmlc`) through the built-in WAP gateway | WML `<card>` deck, no HTML, text + `<a>` links only, Latin-1, paginated to 860-byte pages |
-| `0` | `EPOCH_PRESTANDARD` | Text browsers (Lynx, Cello, Line Mode Browser) | `text/html; charset=UTF-8` (bare `text/html` + Latin-1 body for Cello) | Bare `<html>`, no styling attributes, `<h1>/<h2>/<hr>/<a>` only |
-| `1` | `EPOCH_EARLY` | Mosaic, Netscape 1-2, MSIE ≤ 4 | `text/html` | HTML 3.2, `<table>` layout, `<font>`, `bgcolor`, no CSS/JS |
-| `2` | `EPOCH_MIDDLE` | Netscape 4, MSIE 5-8, early Firefox/Chrome | `text/html; charset=UTF-8` | HTML 3.2 tables, presentational attributes, no external stylesheet |
-| `3` | `EPOCH_MODERN` | Current browsers | `text/html; charset=UTF-8` | HTML5 + CSS3 (`styles_epoch3.css`), responsive |
+| `-1` | `EPOCH_WML` | WAP 1.x phones (Nokia, Openwave/UP.Browser 4+ - 3.x speaks only HDML and is not served -, Obigo, and manufacturer-prefix firmware - SIE-, SEC-, MOT-, LG-, Ericsson, Panasonic, SANYO, SHARP, Alcatel, PHILIPS) | `text/vnd.wap.wml` over HTTP; compiled **WBXML** (`application/vnd.wap.wmlc`) through the built-in WAP gateway | WML `<card>` deck, no HTML, text + `<a>` links only, Latin-1, paginated to 860-byte pages |
+| `0` | `EPOCH_PRESTANDARD` | Text browsers (Lynx, w3m, ELinks, Cello, the CERN Line Mode Browser) and any HTTP/0.9 client (answered with a header-less Simple-Response) | `text/html; charset=UTF-8` (bare `text/html` + Latin-1 body for Cello, Line Mode and HTTP/0.9) | A strict HTML 2.0 subset, no DOCTYPE, that a 1991 parser degrades to plain text: bare `<html>`, no styling attributes, `<h1>`-`<h6>`/`<p>`/`<hr>`/`<a>`/`<ul>`/`<pre>`; no CSS/JS |
+| `1` | `EPOCH_EARLY` | Mosaic, Netscape 1-2, MSIE ≤ 3, Opera ≤ 4 | `text/html` | HTML 3.2 (`<table>` layout, `<font size/color>`, body colors) plus two HTML 4.0 Transitional attributes, `<font face>` and cell `bgcolor` - full fidelity from Netscape 3 / MSIE 3; no CSS/JS |
+| `2` | `EPOCH_MIDDLE` | Netscape 3-4, MSIE 4-11, EdgeHTML, Opera 5-12, and every browser below epoch 3's floors | `text/html; charset=UTF-8` | HTML 4.01 Transitional tables with IE/Netscape extensions (`bordercolor`, table `background`, body margins); an inline CSS1 `<style>` (plus CSS2 `a:hover`, IE `expression()`); one JavaScript 1.0 handler; no external stylesheet |
+| `3` | `EPOCH_MODERN` | Chrome/Edge 87+, Firefox 66+, Safari 14.1+ / iOS 14.5+ | `text/html; charset=UTF-8` | HTML5; CSS of 2020-21 (custom properties, grid, flex `gap`, `inset`) in `styles_epoch3.css`; ES2015 JavaScript. The dashboard needs more: `:has()`, `color-mix()` (Chrome 111, Firefox 121, Safari 16.2) |
 
 Classification is a simple, dependency-free substring/version heuristic over `User-Agent`, with
 epoch `1` as the fallback for anything unrecognized (better to render an old-but-working page
@@ -111,13 +115,19 @@ than to assume modern capabilities).
 `resolve_epoch()` puts two overrides in front of detection: `force_epoch` from the config, then a
 `?preview_epoch=N` query parameter - honored on every route, which is how the dashboard's preview
 iframe browses the site as any epoch and how the WAP gateway asks for WML. Independently, the
-**charset** decision follows the *real* browser (`request_charset`): Cello, a genuinely
-pre-Unicode browser classified as epoch 0, gets its page transcoded to Latin-1 like epoch 1.
+**charset** decision follows the *real* browser (`request_charset`): the genuinely pre-Unicode
+readers of epoch 0 - Cello, the CERN Line Mode Browser and any HTTP/0.9 client - get their page
+transcoded to Latin-1 like epoch 1. A genuine HTTP/0.9 request (no version, no headers, so no
+`User-Agent`) goes to epoch 0 and gets the document alone, without status line or headers (see
+[reference/rendering.md](reference/rendering.md#legacy-http-compatibility)).
 
 > **Login is `EPOCH_MODERN`-only.** For security reasons, the `/login` form (and all
-> credential handling) is only served to `EPOCH_MODERN` (epoch `3`) clients - enforced
-> server-side on both `GET` and `POST /login`. The other four epochs show a static
-> "this functionality is not available" message instead. See
+> credential handling) is only served to `EPOCH_MODERN` (epoch `3`) clients that the browser
+> detection rules also grant the dashboard (factory: Chrome 111, Firefox 121, Safari 16.2 - the
+> admin stylesheet's floor) - enforced server-side on both `GET` and `POST /login` and every
+> `/dashboard*` route (`dashboard_allowed()`). The other four epochs show a static
+> "this functionality is not available" message, and older epoch 3 browsers a "needs a more
+> recent browser" one. See
 > [§5, Authentication](#5-authentication-login-dashboard-and-logout).
 
 ```plantuml
@@ -139,37 +149,43 @@ if (?preview_epoch=N in the query, N in -1..3?) then (yes)
   stop
 endif
 
-:Read "User-Agent" header;
+if (HTTP/0.9 request (no version, no headers)?) then (yes)
+  #FFF3E0:epoch = 0 (EPOCH_PRESTANDARD);
+  :Simple-Response: the document alone,\nno status line or headers; Latin-1 body;
+  stop
+endif
 
-if (WAP tokens present AND "AppleWebKit" absent?) then (yes)
+:Read "User-Agent" header;\nclassify by the browser detection rules\n(factory rules below, editable in the dashboard);
+
+if (WAP tokens present AND "AppleWebKit",\n"UP.Browser/3" absent?) then (yes)
   #FFE0E0:epoch = -1 (EPOCH_WML);
   :Content-Type = text/vnd.wap.wml\n(WBXML via the WAP gateway);
   :Template style: WML <card> deck,\nno HTML, text + <a> links only;\nLatin-1, 860-byte pages;
   stop
 endif
 
-if (Lynx / Cello / Line Mode Browser?) then (yes)
+if (Lynx / w3m / ELinks / Cello / LineMode?) then (yes)
   #FFF3E0:epoch = 0 (EPOCH_PRESTANDARD);
-  :Content-Type = text/html; charset=UTF-8\n(Cello: bare text/html + Latin-1 body,\nper request_charset);
+  :Content-Type = text/html; charset=UTF-8\n(Cello, Line Mode: bare text/html + Latin-1 body,\nper request_charset);
   :Template style: bare <html>,\nno styling attributes,\n<h1>/<h2>/<hr>/<a> only;
   stop
 endif
 
-if (Mosaic / Netscape 1-2 / MSIE <= 4?) then (yes)
+if (Mosaic / Netscape 1-2 / MSIE <= 3 /\nOpera <= 4?) then (yes)
   #FFFDE7:epoch = 1 (EPOCH_EARLY);
   :Content-Type = text/html (Latin-1 body);
   :Template style: HTML 3.2,\n<table> layout, <font>, bgcolor,\nno CSS / no JS;
   stop
 endif
 
-if (Netscape 4 / MSIE 5-8 / old Firefox-Chrome?) then (yes)
+if (Netscape 3-4 / MSIE 4-11 / EdgeHTML / Opera 5-12 /\nbelow the epoch 3 floors / unknown "Mozilla/3+"?) then (yes)
   #E8F5E9:epoch = 2 (EPOCH_MIDDLE);
   :Content-Type = text/html; charset=UTF-8;
-  :Template style: HTML 3.2 tables,\npresentational attributes;
+  :Template style: HTML 4.01 Transitional tables,\npresentational attributes, inline CSS1;
   stop
 endif
 
-if (Firefox >= 4 / Chrome >= 10 / Safari /\nother "Mozilla/5+"?) then (yes)
+if (Chrome >= 87 / Firefox >= 66 /\nSafari >= 14.1 / iOS >= 14.5?) then (yes)
   #E3F2FD:epoch = 3 (EPOCH_MODERN);
   :Content-Type = text/html; charset=UTF-8;
   :Template style: HTML5 + CSS3\n(styles_epoch3.css), responsive;
@@ -566,7 +582,7 @@ note right of RESP
   Content-Type by epoch:
   -1     -> text/vnd.wap.wml
   0      -> text/html; charset=UTF-8
-            (bare text/html for Cello)
+            (bare text/html for Cello, Line Mode, HTTP/0.9)
   1      -> text/html
   2, 3   -> text/html; charset=UTF-8
   + SECURITY_HEADERS
@@ -630,7 +646,7 @@ The CMS sits on top of a generic, dependency-light static file server:
   - `GET`/`POST /dashboard/...` → the admin area: entries listing and editor, media library,
     Categories, Languages, Menu, Users, Site settings (themes, logo, CSS, fonts, preview) and
     Analytics (see [reference/dashboard.md](reference/dashboard.md)).
-  - `POST /login` → `EPOCH_MODERN` only; verifies credentials against MongoDB and on success
+  - `POST /login` → `EPOCH_MODERN` with dashboard access only (`dashboard_allowed()`); verifies credentials against MongoDB and on success
     sets a session cookie and redirects to `/dashboard`. See §5.
   - `GET`/`HEAD <anything else>` → `serve_static_file()` against the `html/` root, with
     `Last-Modified` / `If-Modified-Since` cache validation, MIME type detection and 8 KiB
@@ -746,7 +762,7 @@ else all components OK
   deactivate ORCH
 
   ROUTER -> RESP : build_epoch_response(body, "", epoch)
-  RESP -> RESP : ?lang (epochs -1/0/1), WML pagination,\n?theme (epochs 1/2), WML fixups,\nLatin-1 (epoch 1, WML, Cello)
+  RESP -> RESP : ?lang (epochs -1/0/1), WML pagination,\n?theme (epochs 1/2), WML fixups,\nLatin-1 (epoch 1, WML, Cello,\nLine Mode, HTTP/0.9)
   RESP --> ROUTER : response\n(headers + body)
   ROUTER -> ROUTER : free(body)
 
@@ -916,7 +932,7 @@ The full request table:
 | Route | Method | Behavior |
 |---|---|---|
 | `/login` | `GET` | If `mongodb_manager_is_ready()` and the session cookie is valid → `302 /dashboard`. Otherwise `login(epoch, NULL)` via `buildPageWebSite()`. `EPOCH_MODERN`: real form. Other epochs: "not available". |
-| `/login` | `POST` | `EPOCH_MODERN` only (other epochs re-render "not available", no DB access). `503` if MongoDB isn't ready. Otherwise `auth_login_user()` → success: new session + `Set-Cookie` + `302 /dashboard`; failure: `200` with the form + "Invalid email or password." |
+| `/login` | `POST` | `EPOCH_MODERN` with dashboard access only (`dashboard_allowed()`; others re-render "not available" / "needs a more recent browser", no DB access). `503` if MongoDB isn't ready. Otherwise `auth_login_user()` → success: new session + `Set-Cookie` + `302 /dashboard`; failure: `200` with the form + "Invalid email or password." |
 | `/dashboard` | `GET` | `503` if MongoDB isn't ready. Otherwise `validate_session_cookie()`: valid → `dashboard(epoch)` via `buildPageWebSite()` (epoch 3: a "Menu" dropdown with the option groups, an analytics summary with SVG charts for admins, then entries pending publication); invalid/missing/expired → `302 /login`. |
 | `/dashboard/entries` | `GET` | Epoch 3, any role: every entry, published or not ("View all"). |
 | `/logout` | `POST` | CSRF-checked when a session cookie is present (`403` otherwise); destroys the session (if any) and responds `302 /` with a cleared `session` cookie (`Max-Age=0`). `GET` → `405`. Sent by the **Log out** button next to "Welcome back" on the dashboard home. |
@@ -993,12 +1009,13 @@ Features added after the initial home-page MVP (dated history in [../CHANGELOG.m
 - **Languages**: `languages` collection drives the default content language; `/dashboard/languages` to add/remove/set default; **per-visitor language** via `?lang=` and a `lang` cookie (`/language`, `/language/set`), carried through links on old epochs.
 - **Multipart body reading**: router reads full POST body based on `Content-Length` (supports file uploads up to 10 MiB, `413` beyond).
 - **Site personalization**: site name (`site_settings`), per-theme raw-HTML banner/footer per epoch with image uploads, `/dashboard/settings/preview` (any epoch, any screen size) and a signed-in-user navbar link.
-- **Theme system**: `html/templates/` (shared) vs `html/themes/<theme>/` split, per-request theme resolution (`?theme=` → cookie → active theme → config) with a visitor theme selector, a `themes` collection with 34 DB-editable colors (backgrounds with opacity), structured per-epoch logos (epoch −1 PNG/JPEG uploads converted to WBMP), an editable epoch 3 stylesheet with restore, and a **font library** (`/dashboard/settings/fonts`) for the epoch 3 logo - see [reference/themes.md](reference/themes.md).
+- **Theme system**: `html/templates/` (shared) vs `html/themes/<theme>/` split, per-request theme resolution (`?theme=` → cookie → active theme → config) with a visitor theme selector, a `themes` collection with 34 DB-editable colors (backgrounds with opacity), structured per-epoch logos (epoch −1 a PNG plus its WBMP twin), a customization layer over each epoch 3 stylesheet, a **theme customizer** with live preview, and a **font library** (`/dashboard/settings/fonts`) for the epoch 3 logo - see [reference/themes.md](reference/themes.md).
 - **WML for real devices**: every WML response paginated to single-packet (860-byte) pages, compact `[Menu]`/`[Categories]` links with `/menu` and `/blog/categories` pages, and the **WAP 1.x gateway** (UDP, WBXML) - see [reference/wap-gateway.md](reference/wap-gateway.md).
-- **Legacy browser charset**: Latin-1 transcoding for epoch 1, WML and Cello (`request_charset`).
-- **Analytics**: per-day visit counters by epoch, browser, OS, country (optional GeoLite2) and route, top entries, `/dashboard/analytics` report, import migration - see [reference/analytics.md](reference/analytics.md).
+- **Legacy browser charset**: Latin-1 transcoding for epoch 1, WML and the pre-Unicode readers of epoch 0 - Cello, the Line Mode Browser, HTTP/0.9 clients (`request_charset`).
+- **HTTP/0.9**: a genuine simple request gets an RFC 1945 Simple-Response (no status line or headers) in epoch 0; static files keep their headers (Cello).
+- **Analytics**: per-day visit counters by epoch, browser, OS, country (optional GeoLite2) and route, top entries, `/dashboard/analytics` report - see [reference/analytics.md](reference/analytics.md).
 - **Hardening**: configurable anti-DDoS (`ddos_*`), IP-table cleanup thread, `429` for rejected HTTP connections, configurable I/O timeout, accept loop on its own thread for a prompt shutdown.
-- **Operations**: `install` keeps the host's `settings.conf` and certificates, merges `html/`, installs logrotate and GeoLite2; `scripts/migrations/` for data migrations.
+- **Operations**: `install` keeps the host's `settings.conf` and certificates, merges `html/`, installs logrotate and GeoLite2.
 
 ## 9. Roadmap (not yet implemented)
 

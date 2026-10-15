@@ -41,12 +41,9 @@ collections). Nothing else in the code base opens a collection.
 | `themes` | Sparse per-theme overrides (colors, banner, footer, logo, CSS) | `cms_themes.c` | `cms_themes.c` |
 | `fonts` | Uploaded font library | `cms_fonts.c` | `cms_fonts.c` |
 | `short_links` | Short codes for QR codes | `short_links.c` | `short_links.c` |
+| `browser_detection` | Singleton: browser detection rules and test cases | `cms_browser_detection.c`, `browser_detection_bson.c` | `cms_browser_detection.c` |
 | `page_visits_daily` | Site-wide analytics, one document per day | `analytics.c` (write), `analytics_view.c` (read) | both `.c` files |
 | `entry_visits_daily` | Per-entry analytics, one document per entry per day | `analytics.c` (write), `analytics_view.c` (read) | both `.c` files |
-
-Staging collections `page_visits_daily_import` / `entry_visits_daily_import` exist only
-transiently while running the `2026-10-03-merge-analytics.js` migration, which drops them when
-done (see [migrations.md](migrations.md)).
 
 ---
 
@@ -229,12 +226,21 @@ back to the theme's on-disk files or to `THEME_DEFAULTS` in `cms_themes.c`.
                 "navbar_image": "", "footer_image": "" }, ...
   },
   "logo_font": "MyFont",                 // epoch 3 navbar font from the Colors panel
-  "css_epoch3": "...",                   // full override of styles_epoch3.css; "" = use file
-  "css_admin_epoch3": "..."              // full override of styles_admin_epoch3.css; "" = use file
+  "home_blog_background":      { "epoch2": "grid.gif", "epoch3": "grid.jpg" },  // "" = theme's own
+  "home_blog_item_background": { "epoch2": "card.gif", "epoch3": "card.jpg" },
+  "home_blog_item_color":      { "epoch2": "0" },  // "0" hides epoch 2's item bgcolor; unset = shown
+  "css_custom_epoch3": "...",            // layer appended after styles_epoch3.css; "" = none
+  "css_admin_custom_epoch3": "..."       // layer appended after styles_admin_epoch3.css
 }
 ```
 
 `logo.<epoch>.mode` is the `CmsLogoMode` enum: `0` unset, `1` text, `2` image.
+
+Every image field (`logo.*.navbar_image` / `footer_image`, `home_blog_*background`) holds a bare
+filename under `html/content/themes/<key>/<logo|home-blog>/epoch<N>/`; on epoch −1 it is the
+`.wbmp`, with its `.png` twin beside it. Banner and footer markup reference their uploads by full
+`/content/themes/...` path. The `css_epoch3` / `css_admin_epoch3` fields of earlier versions
+(full stylesheet replacements) are no longer read.
 
 ### `fonts`
 
@@ -244,6 +250,31 @@ back to the theme's on-disk files or to `THEME_DEFAULTS` in `cms_themes.c`.
 
 Files live under `html/assets/fonts/`. `name` is both the display name and the CSS
 `font-family` value, so it is restricted to `[A-Za-z0-9 _-]` on upload.
+
+### `browser_detection`
+
+```jsonc
+{
+  "_id": "rules",                       // the only document
+  "fallback_epoch": 1,                  // when no rule matches
+  "rules": [                            // ordered: the first match decides
+    { "name": "Chrome", "enabled": true,
+      "contains": ["Chrome/"], "excludes": [],          // case-sensitive substrings
+      "version_after": "Chrome/",                       // "" = no version, no tiers
+      "tiers": [ { "from": "87",  "epoch": 3, "dashboard": false },
+                 { "from": "111", "epoch": 3, "dashboard": true } ],
+      "epoch": 2, "dashboard": false }                  // when no tier is reached
+  ],
+  "cases": [ { "name": "Chrome 86", "user_agent": "Mozilla/5.0 ...", "epoch": 2, "dashboard": false } ],
+  "updated_at": ISODate, "updated_by": ObjectId         // users._id
+}
+```
+
+Written by `/dashboard/settings/browsers` ([dashboard.md](dashboard.md)), read once at startup
+and after each save into memory - never per request. No document (the default, and what *Restore
+factory rules* leaves) means the factory rules in `detect_epoch.c`; so does a document that fails
+to parse or validate (logged). Limits: 64 rules, 32 tokens per list, 8 tiers, 300 cases, tokens
+under 64 bytes, User-Agents under 1 KiB.
 
 ### `short_links`
 

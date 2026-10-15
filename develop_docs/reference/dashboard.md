@@ -114,6 +114,11 @@ Loads `error_epoch<N>.html` and fills its 2 `%s` placeholders (status code, mess
 
 ### Routes
 
+**`EPOCH_MODERN` only** below means `dashboard_allowed()` (`http_router.c`): the request resolves
+to epoch 3 **and** the browser detection rules grant its real `User-Agent` the dashboard (factory:
+Chrome 111, Firefox 121, Safari 16.2 - the admin stylesheet's floor, [epochs.md](epochs.md)). An
+epoch 3 browser below that floor sees "needs a more recent browser" on `/login` and `/dashboard`.
+
 | Route | Method | Behavior |
 |---|---|---|
 | `/login` | `GET` | If `mongodb_manager_is_ready()` and the request carries a valid session cookie, `302 /dashboard`. Otherwise renders `login_epoch<N>.html` via `buildPageWebSite()`. For `EPOCH_MODERN`, a real form; other epochs show "not available". |
@@ -141,7 +146,7 @@ Loads `error_epoch<N>.html` and fills its 2 `%s` placeholders (status code, mess
 | `/dashboard/api/entries/<id>/...` | `POST` | The editor's five AJAX endpoints (`meta`, `header`, `content`, `blocks`, `blocks/<block_id>/delete`). All share the same gate: `require_dashboard_session_role()`, `404 {"ok":false,"error":"not found"}` if `<id>` doesn't resolve, `403 {"ok":false,"error":"forbidden"}` if `!can_edit_entry()`. Payloads and responses in [entry-editor.md](entry-editor.md). |
 | `/dashboard/api/block-preview` | `POST` | `require_dashboard_session()` - any role. Renders one block as epoch 3 would, for the editor ([entry-editor.md](entry-editor.md#block-preview)). |
 | `/dashboard/media`, `/dashboard/api/media/...` | `GET`/`POST` | `require_dashboard_session()` - any role; writes also `require_dashboard_session_role()` + `media_can_manage()` (an `author` only touches their own directories/images). See [media-admin.md](media-admin.md). |
-| `/dashboard/settings`, `/dashboard/settings/themes*`, `/dashboard/settings/preview`, `/dashboard/settings/fonts*`, `/dashboard/api/theme-assets/*` | `GET`/`POST` | **`EPOCH_MODERN` only**, `require_admin_session()`. Site name, themes (activate, colors, banner, footer, logo, CSS), epoch preview, font library. See [themes.md](themes.md), [fonts.md](fonts.md) and the full list in [routes.md](routes.md#settings-themes-fonts-preview). |
+| `/dashboard/settings`, `/dashboard/settings/themes*`, `/dashboard/settings/preview`, `/dashboard/settings/fonts*`, `/dashboard/settings/browsers*`, `/dashboard/api/theme-assets/*`, `/dashboard/api/browsers*` | `GET`/`POST` | **`EPOCH_MODERN` only**, `require_admin_session()`. Site name, themes (activate, colors, banner, footer, logo, CSS), epoch preview, font library. See [themes.md](themes.md), [fonts.md](fonts.md) and the full list in [routes.md](routes.md#settings-themes-fonts-preview). |
 | `/dashboard/analytics` | `GET` | **`EPOCH_MODERN` only**, `require_admin_session()`. Visit report by period. See [analytics.md](analytics.md#the-report). |
 | `/dashboard/users` | `GET` | **`EPOCH_MODERN` only** (other epochs `302 /dashboard`). `require_admin_session()`. Renders `users_admin_list(epoch, NULL)`: every `users` document sorted by email, with its role label ("Administrador"/"Autor" - a missing `role` field reads as `"admin"`/"Administrador"). |
 | `/dashboard/users/new` | `GET` | Same guards. Renders `users_admin_form(epoch, "", "", "author", NULL)`. |
@@ -429,7 +434,7 @@ A media library for uploading and managing images used in entries. Requires a da
 - `media_directories` - folder structure: `{ _id, name, parent, author_id }`. Each directory maps to a physical folder at `html/content/posts/<username>/<dirname>/`.
 - `media_galleries` - gallery data for public rendering: `{ _id, content: [url, ...], entry_id }`. Created/updated automatically when saving an entry's `gallery` content block.
 
-**Image variants**: `scripts/image-optimizer.sh` processes each upload via ImageMagick and generates 5 variants (`_full`, `_half`, `_small`, `_medium`, `_micro`) before deleting the original. The base URL (without suffix) is a symlink to `_half`. Requires `imagemagick`, `jpegoptim`, `gifsicle`.
+**Image variants**: `scripts/image-optimizer.sh` processes each upload via ImageMagick and generates 5 variants (`_full`, `_half`, `_small`, `_medium`, `_micro`) before deleting the original; only the variants are kept, so the stored base URL (without suffix) is never a file - pages always request a variant. Requires `imagemagick`, `jpegoptim`, `gifsicle`.
 
 **Routes**:
 
@@ -482,12 +487,14 @@ A media library for uploading and managing images used in entries. Requires a da
   form's `categories` multi-select, where each selected option shares `name="categories"`).
   Each returned `out_values[i]` is malloc'd; the caller frees them.
 - `match_theme_epoch_route(decoded_url, segment, key_out, …, epoch_out, …)`: matches
-  `/dashboard/settings/themes/<key>/<segment>/<epoch>` for the banner/footer/logo saves (the
-  epoch may be `-1`).
+  `/dashboard/settings/themes/<key>/<segment>/<epoch>` for the banner/footer/logo/home-blog
+  saves (the epoch may be `-1`).
 - `match_theme_css_url()`: matches `/themes/<key>/styles_epoch3.css` and `/themes/<key>/styles_admin_epoch3.css`.
 - `match_theme_css_editor()`: matches the CSS editor's `…/css` and `…/admin-css` routes (plus `/restore`).
 - `theme_assets_dir()`, `sanitize_asset_filename()`, `mkdir_recursive()`: validation and
-  filesystem helpers for the theme-assets and font uploads ([security.md](security.md#request-handling)).
+  filesystem helpers for the theme-assets and font uploads ([security.md](security.md#request-handling));
+  `theme_assets_dir()` resolves `html/content/themes/<key>/<component>/epoch<N>/`.
+- `wap_twin_name()`: an epoch −1 upload's PNG/WBMP twin name (`logo.png` ↔ `logo.wbmp`).
 - `parse_bg_color_field()`: joins a color picker and an opacity field into `#rrggbb[aa]`.
 - `viewer_can_preview_drafts()`: any valid session - lets `serve_cms_entry()` show drafts.
 
@@ -499,13 +506,14 @@ Admin-only, epoch 3. Summary - the reference is [themes.md](themes.md):
 
 | Page | What it edits | Stored in |
 |---|---|---|
-| `/dashboard/settings` | Site name (replaces `{{SITE_NAME}}` everywhere) | `site_settings.site_name` |
-| `/dashboard/settings/themes` | The list of directories under `html/themes/`: each one's name, *Active* or *Set active*, and *Edit* | `site_settings.active_theme` |
-| `…/themes/<key>` | One theme: *Set active* (unless it is), the 40 colors (backgrounds with opacity), the epoch 3 logo font, links to its banner/footer/logo/CSS editors | `themes.colors`, `themes.logo_font` |
-| `…/themes/<key>/banner`, `…/footer` | Raw markup per epoch (−1…3) + image upload/browse | `themes.banner_html`, `themes.footer_html`, files in `html/themes/<key>/assets/` |
-| `…/themes/<key>/logo` | Per-epoch logo: text (0), image (−1, 1, 2; −1 auto-converted to WBMP) or either (3) | `themes.logo` |
-| `…/themes/<key>/css`, `…/admin-css` | Full epoch 3 stylesheets, public and admin (one tab each), with *Restore original* | `themes.css_epoch3`, `themes.css_admin_epoch3` |
+| `/dashboard/settings` | Site name (replaces `{{SITE_NAME}}` everywhere) and the epoch 2 / epoch 3 favicons | `site_settings.site_name`; `html/favicon2.ico`, `html/favicon3.ico` |
+| `/dashboard/settings/themes` | The list of directories under `html/themes/`: each one's name, *Active* or *Set active*, and *Customize* | `site_settings.active_theme` |
+| `…/themes/<key>/customize` | The theme customizer: pick an epoch, then its logo, navbar, banner, content, home blog, footer and data colors, with a live preview (WML translated for epoch −1) and the public CSS layer in a bottom drawer. `…/themes/<key>` redirects here | everything below, plus `themes.home_blog_background`, `themes.home_blog_item_background`, `themes.home_blog_item_color` |
+| `…/themes/<key>/banner`, `…/footer` | Raw markup per epoch (−1…3) in the code editor + the epoch's uploaded images | `themes.banner_html`, `themes.footer_html`, files in `html/content/themes/<key>/` |
+| `…/themes/<key>/logo` | Per-epoch logo: text (0), image (−1, 1, 2; −1 a PNG plus its WBMP twin) or either (3) | `themes.logo` |
+| `…/themes/<key>/css`, `…/admin-css` | A compatibility notice when the served sheet (original + layer) uses CSS that browsers the detection rules still serve it to lack - e.g. `:has()` while Chrome 104 still gets epoch 3 ([css_compat.h](../../src/utils/css_compat.h)). A customization layer over each epoch 3 stylesheet, public and admin (one tab each), the original read-only below, *Discard my changes* | `themes.css_custom_epoch3`, `themes.css_admin_custom_epoch3` |
 | `/dashboard/settings/preview` | Nothing - an iframe of the site in any epoch and screen size (`?preview_epoch=`) | - |
+| `/dashboard/settings/browsers` | Browser detection: the ordered rules that pick each browser's epoch and its dashboard access (contains / excludes tokens, the version token, tiers), the fallback epoch, a *Try a User-Agent* box, and test cases that re-run on every edit and show what would change, and a *Stylesheet check* of every theme's public and admin sheet against the rules being edited. *Save* is refused if the saving browser would lose the dashboard; *Restore factory rules* | `browser_detection` |
 | `/dashboard/settings/fonts` | Uploaded font library ([fonts.md](fonts.md)) | `fonts`, `html/assets/fonts/` |
 
 Modules: `src/modules/site_settings_admin/`, `src/modules/fonts_admin/`; templates under

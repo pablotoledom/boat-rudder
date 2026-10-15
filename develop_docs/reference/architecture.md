@@ -48,7 +48,7 @@ own documents:
 | [configuration.md](configuration.md) | Every `configs/settings.conf` key - the single reference for configuration |
 | [security.md](security.md) | Every defense (anti-DDoS, TLS, sanitizers, sessions, roles) and known gaps |
 | [data-flow.md](data-flow.md) | The same system read as one request's journey, start to finish |
-| [scripts.md](scripts.md) / [migrations.md](migrations.md) | Build, run, install, backup scripts; database migrations |
+| [scripts.md](scripts.md) | Build, run, install, backup scripts |
 | [third-party.md](third-party.md) | Vendored, ported and linked third-party code and data |
 | [style-guide.md](style-guide.md) | C conventions, the security rules that are non-negotiable here, and BEM CSS class names |
 
@@ -138,11 +138,12 @@ boat-rudder/
 │       ├── log.c/h                      # Leveled, thread-safe logging macros
 │       ├── http_utils.c/h               # MIME detection, URL encode/decode, HTML encode,
 │       │                                # path sanitizer, trusted proxy check
-│       ├── detect_epoch.c/h             # User-Agent → epoch heuristic, epoch_to_index()
+│       ├── detect_epoch.c/h             # User-Agent → epoch: rule engine, factory rules, active set
+│       ├── css_compat.c/h               # CSS features vs. the detection rules' floors
 │       ├── request_lang.c/h             # Per-request content language + request path
 │       ├── request_theme.c/h            # Per-request theme (?theme= → cookie → DB → config)
 │       ├── request_user.c/h             # Per-request signed-in user's display name
-│       ├── request_charset.c/h          # Per-request "real browser needs Latin-1" (Cello)
+│       ├── request_charset.c/h          # Per-request "real browser needs Latin-1" (Cello, Line Mode, HTTP/0.9)
 │       ├── request_code_lines.c/h       # Per-request ?code_lines=off
 │       ├── request_wml.c/h              # Per-request WML target + ?wml_pages=all
 │       ├── theme_catalog.c/h            # Theme discovery/validation under html/themes/
@@ -150,7 +151,7 @@ boat-rudder/
 │       ├── code_highlight.c/h           # Server-side syntax highlighting (code-highlighting.md)
 │       ├── ua_parser.c/h                # User-Agent → browser/OS keys for analytics
 │       ├── qr_generator/                # QR codes for retro epochs (GIF/WBMP/text)
-│       ├── image_convert/               # PNG/JPEG → 1-bit WBMP (epoch -1 logos)
+│       ├── image_convert/               # PNG → 1-bit WBMP (epoch -1 theme uploads)
 │       ├── wbmp_writer.c/h              # WBMP writer shared by QR and logo conversion
 │       ├── read_file.c/h                # read_file_to_string(): malloc'd file contents
 │       ├── template_utils.c/h           # render_template, str_replace_first/_all, str_append,
@@ -164,8 +165,10 @@ boat-rudder/
 ├── html/                                # Static + templated content root (CLI root directory)
 │   ├── templates/                       # Shared, theme-agnostic templates (templates-catalog.md)
 │   ├── themes/<theme>/                  # Per-theme templates, assets, styles(_admin)_epoch3.css
-│   ├── assets/                          # Site-wide assets (fonts/, slide/)
-│   └── content/                         # posts/<user>/<dir>/ uploads, qr/ cache (gitignored)
+│   ├── assets/                          # Site-wide assets: fonts/, js/ (dashboard scripts: csrf,
+│   │                                    # code editor, theme customizer, upload widgets, color picker)
+│   └── content/                         # posts/<user>/<dir>/ uploads, themes/<key>/ theme uploads,
+│                                        # qr/ cache (gitignored)
 ├── scripts/
 │   ├── image-optimizer.sh               # Generates 5 image variants per upload via ImageMagick
 │   ├── compile_debug.sh / compile_prod.sh / run_debug.sh / install.sh / uninstall.sh / clean.sh
@@ -173,7 +176,6 @@ boat-rudder/
 │   ├── mongodb_start.sh / mongodb_dump.sh / mongodb_restore.sh
 │   ├── boat-rudder.service              # systemd unit installed by install.sh
 │   ├── boat-rudder.logrotate            # /etc/logrotate.d/boat-rudder, installed by install.sh
-│   ├── migrations/                      # One-off mongosh data migrations (migrations.md)
 │   └── show/                            # banner/divbar snippets sourced by the scripts
 ├── configs/
 │   └── settings.conf                    # Runtime configuration (configuration.md)
@@ -303,12 +305,16 @@ Both `ssl_read` and `plain_read` share the `read_func_t` signature so the rest o
   prove more data is still coming before the loop gives up waiting for one - long enough not to
   mistake a slow, well-formed multi-packet request for a truncated one. See
   [rendering.md](rendering.md#legacy-http-compatibility) for
-  the real client behavior (Cello 1.x) this was fixed against.
+  the real client behavior (Cello 1.x) this was fixed against. A genuine HTTP/0.9 request (no
+  version **and** no headers) also sets the connection's `simple_response` flag: every page and
+  error is then sent as an RFC 1945 Simple-Response - `connection_write()` drops the status line
+  and headers - while the static-file branch clears it, so files keep their headers.
 - **Full body reading**: after headers are parsed, reads the body to completion using `Content-Length` - allocates a buffer of the declared size and loops until all bytes are received. A declared length above `MAX_BODY_SIZE` (10 MiB) is answered `413` before reading. This supports both small form posts and large multipart file uploads.
 - Parses headers with `parse_http_request()`.
 - Extracts the real client IP: honors `X-Real-IP` / `X-Forwarded-For` **only when the peer IP matches the `trusted_proxies` config list**, falling back to the raw socket address for all other peers.
 - Validates the request line (400 Bad Request on failure).
-- `resolve_epoch(req)`: the configured `force_epoch` override (if in `-1..3`), otherwise a valid `?preview_epoch=N` anywhere in the query string (the dashboard preview), otherwise `detect_epoch(User-Agent)`.
+- `resolve_epoch(req)`: the configured `force_epoch` override (if in `-1..3`), otherwise a valid `?preview_epoch=N` anywhere in the query string (the dashboard preview), otherwise epoch 0 for a genuine HTTP/0.9 request (no `User-Agent` to classify), otherwise `detect_epoch(User-Agent)` - the browser detection rules ([epochs.md](epochs.md)).
+- `dashboard_allowed(req, epoch)`: the gate of `/login` and every `/dashboard*` route - epoch 3 **and** the `dashboard` flag the rules give the real `User-Agent`.
 - **Per-request state**, set once before routing and read anywhere below through thread-local
   getters: `request_lang_set()` (`?lang=` / cookie / default), `request_path_set()`,
   `request_user_set()` (session → display name), `request_theme_set()` (`?theme=` / cookie /
@@ -401,7 +407,7 @@ Both `ssl_read` and `plain_read` share the `read_func_t` signature so the rest o
 - `generate_youtube_qr()` (GIF, epochs 1-2), `generate_youtube_qr_wbmp()` and
   `generate_qr_wbmp(text, fs_path)` (any text → WBMP via `wbmp_writer.c`, cached on disk; used
   for WML), `generate_qr_halfblock_text(text)` (any text → Unicode half-block `<pre>` art; epoch
-  0 in a UTF-8 terminal) and `generate_qr_asciiblock_text(text)` (Latin-1 block glyphs for Cello,
+  0 in a UTF-8 terminal) and `generate_qr_asciiblock_text(text)` (Latin-1 block glyphs for Cello, Line Mode and HTTP/0.9,
   chosen when `request_needs_legacy_charset()` - see
   [rendering.md](rendering.md#character-encoding)). Long targets are shortened through
   `/qr/<code>` first - see [qr-and-short-links.md](qr-and-short-links.md).

@@ -37,6 +37,8 @@ void *connection_thread(void *arg) {
 
     conn->client_socket = args->client_socket;
     conn->ssl           = args->ssl;
+    conn->simple_response    = 0;
+    conn->header_end_matched = 0;
     args->ssl           = NULL;
 
 #ifdef SO_NOSIGPIPE

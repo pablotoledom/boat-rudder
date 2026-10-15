@@ -9,9 +9,204 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *A
 
 ---
 
-## [Unreleased] - v0.0.1
+## v0.0.1
 
-### 2026-10-06 - One page per theme
+### 2026-10-14
+### Gallery block editing
+
+**Changed**
+- Uploaded file names: spaces and dots before the extension become `_`, and anything outside
+  `[A-Za-z0-9_-]` is dropped (`Mi foto (1).jpg` → `Mi_foto_1.jpg`). A name already used in the
+  directory gets `_2`, `_3`... (`photo.png` and `photo.jpg` count as the same name, since they'd
+  share their variants).
+- The gallery block shows its photos as numbered tiles: each can be moved with ← / → or dragged,
+  and removed with ×. *Add photos* (header button and the last tile) appends the picked photos
+  after the existing ones, skipping duplicates, instead of replacing the whole gallery.
+
+**Fixed**
+- Reordering a gallery's thumbnails was erratic after picking photos again: every re-render
+  added another set of drag listeners, so one drag moved a thumbnail several times.
+- Media library: deleting (or moving) photos while no directory was selected - how the picker
+  opens, on the latest uploads - left them in the grid until it was reopened; the grid now
+  reloads whatever it is showing.
+- Media uploads: a file whose extension didn't match its content (a WebP saved as `.jpg`) was
+  refused with `415`. The content now decides: any JPEG/PNG/GIF/WebP is accepted and stored under
+  its real extension; anything else is still refused.
+- An author's first upload with no directory selected failed with `500` when they had no folder
+  under `html/content/posts/` yet: the default directory was created before its parent.
+- The optimizer no longer leaves a base-name symlink to `_half` (`photo.jpg → photo_half.jpg`)
+  next to the variants: it looked like an undeleted original, and nothing requests the bare
+  name - every page asks for a variant. After an upload only `_full`, `_half`, `_small`,
+  `_medium` and `_micro` remain. Deleting or moving an older upload still removes its link.
+- Media uploads are now written with `O_CREAT | O_EXCL | O_NOFOLLOW`: an upload can never write
+  through an existing base-name symlink (into another upload's `_half` variant) or over any
+  existing file, even if the unique-name step were bypassed.
+- Uploading a file whose name already existed in the directory overwrote the earlier upload's
+  `_half` variant (written through its base-name symlink) and added a second media record for
+  the same files, so deleting either removed both pictures.
+
+### 2026-10-11
+### Browser detection from the dashboard
+
+**Added**
+- `/dashboard/settings/browsers` (Site → Browser detection): the rules that pick each browser's
+  epoch, editable without recompiling - ordered rules of *contains* / *excludes* tokens, the
+  token a version follows, version tiers (epoch, dashboard access), a fallback epoch - plus a
+  *Try a User-Agent* box and test cases that re-run on every edit and show what a change would
+  move. Stored in the new `browser_detection` collection, held in memory (loaded at startup and
+  on save). Until saved, the factory rules apply: the same chain as before, now as data in
+  `detect_epoch.c`.
+- Dashboard browser floor: `/login` and `/dashboard*` now need the `dashboard` flag the rules
+  give the browser (factory: Chrome 111, Firefox 121, Safari / iOS 16.2 - the admin stylesheet's
+  `:has()` and `color-mix()`), not just epoch 3. Read from the real `User-Agent`, so
+  `?preview_epoch=3` can't lift an older browser in; other epoch 3 browsers see "needs a more
+  recent browser".
+- `tests/browser_detection_bson_test.c` (rules to/from BSON and the page's JSON).
+- `develop_docs/reference/epochs.md`: each epoch's technical specification - protocol, encoding,
+  markup, CSS and JS level, full-fidelity floor, the browsers sent to it - and what keeps it true.
+- CSS compatibility check (`src/utils/css_compat.c`): ~20 CSS features with their first Chrome,
+  Firefox and Safari versions (`:has()`, `color-mix()`, container queries, nesting, `dvh`, ...)
+  checked against the detection rules by classifying the version just below each - so it works
+  with whatever rules are saved. Shown on the theme CSS editor (with the active rules) and as a
+  *Stylesheet check* on the Browser detection page (with the rules being edited, every theme,
+  public and admin). `tests/css_compat_test.c` also keeps the shipped stylesheets within the
+  factory floors.
+
+**Changed**
+- Genuine HTTP/0.9 clients (a version-less request with no headers: WorldWideWeb, the early Line
+  Mode Browser, ViolaWWW) get pages as an RFC 1945 Simple-Response - no status line or headers,
+  which they would print as the top of the page - in epoch 0 and Latin-1, instead of epoch 1 with
+  HTTP/1.1 headers. Static files keep their headers (Cello's version-less image fetches need
+  Content-Type).
+- The CERN Line Mode Browser is recognized by its real User-Agent (`LineMode/2.15 libwww/2.17`,
+  `W3CLineMode/5.4.0`), not only "Line Mode Browser": epoch 0 in Latin-1, was epoch 1.
+- UP.Browser 3.x (HDML only, never WML) is no longer sent WML: excluded from the WAP rule.
+- `styles_epoch3.css`: `-webkit-user-select` next to `user-select`, so code line numbers stay
+  out of a copy on Safari too.
+
+**Security**
+- Saving detection rules that would cut the saving browser off the dashboard is refused (`409`).
+
+### 2026-10-11
+### Epoch detection by real capability
+
+**Changed**
+- `detect_epoch()` sends a browser to epoch 3 only from the versions that render its stylesheet:
+  Chrome/Edge 87, Firefox 66, Safari 14.1, iOS 14.5 (flex `gap` and `inset`). Firefox 4-65,
+  Chrome 10-86, older Safari and Android WebViews used to get epoch 3 and lose its layout and
+  colors; they now get epoch 2. Also to epoch 2: EdgeHTML (it carries a `Chrome/` token),
+  Konqueror and any other `Mozilla/5` string no engine claims (legacy crawler UAs included),
+  MSIE 4 (was epoch 1) and Opera 5-12 under its own name (was epoch 1). iOS is decided by the
+  OS version, since CriOS/FxiOS carry no `Chrome/`, `Firefox/` or `Version/` token. Analytics
+  per-epoch counts shift accordingly from this date.
+
+**Added**
+- `tests/detect_epoch_test.c`, the project's first test (CTest): ~50 real `User-Agent`s, one per
+  browser family and version boundary, pinned to their epoch.
+
+### 2026-10-11
+### Retro DOCTYPEs, charset and the epoch 2 blog item color
+
+**Added**
+- Customizer, Home blog, epoch 2: *Show the background color behind the image* checkbox
+  (`themes.home_blog_item_color.epoch2`, shown by default). Epoch 2 has no alpha, so an item
+  image with transparent areas always showed the color through them; unticked, the item
+  `<table>` gets no `bgcolor` and the list's background shows instead.
+
+**Fixed**
+- Epoch 2 home and blog listing: the page backdrop was a constant in `orchestrator.c` - markup
+  in C, always the dark theme's path, and a file that was never shipped (a 404 on every such
+  page). It is now the theme's `layout/body-backdrop_epoch2.html`, requested by the fragments
+  that want it with `{{BODY_BACKDROP}}`; `page_layout_wrap()` loses its `body_background`
+  argument.
+- Epoch 2 blog list items: the theme's "Blog list item" background color was never painted
+  (the template carried it as a disabled `bgcolor-x`). The item `<table>` now has a real
+  `bgcolor`, under the item image (the theme's own or an uploaded one), as on epoch 3.
+- Epoch 1 gallery page (`gallery-page_epoch1.html`): dropped its `charset=UTF-8` meta, which
+  contradicted the Latin-1 body every epoch 1 page is transcoded to (accents broke in any browser
+  honoring it), and its HTML 2.0 DOCTYPE - no other epoch 1 page carries one, and the markup is
+  HTML 3.2 (tables, `<font>`).
+
+**Changed**
+- Epoch 2 pages (`layout_epoch2.html` in both themes, `gallery-page_epoch2.html`,
+  `redirect_epoch2.html`) declare HTML 4.01 Transitional, without a system identifier, instead
+  of HTML 3.2 (or HTML5 on the redirect page): it is what the markup actually uses (`style`,
+  `font face`, cell `bgcolor`), and browsers still render it in quirks mode, as before. The
+  redirect page now declares its charset with `http-equiv` instead of HTML5's `<meta charset>`.
+
+### 2026-10-08 … 2026-10-09
+### Site favicons
+
+**Added**
+- `/dashboard/settings` uploads the site's favicons under the site name: one for epoch 2
+  (`favicon2.ico`, must contain a 16x16 image) and one for epoch 3 (`favicon3.ico`, multi-size),
+  saved in the site root. Pages then link them with a cache-buster; without them each epoch keeps
+  its theme's own favicon. The page previews the current icon of each epoch, and *Use the
+  theme's* removes an upload.
+
+### Theme customizer
+
+**Added**
+- `/dashboard/settings/themes/<key>/customize`: one page to customize a theme. Pick an epoch
+  (−1…3) first; the sidebar - Logo, Navbar, Banner, Content, Home blog, Footer, Data colors, an
+  animated accordion - shows only what that epoch supports (epoch 1 gets its ~10 colors, not all
+  40), beside a live preview of the site in that theme and epoch with screen-size presets.
+  Every panel saves in place (fetch, same endpoints as before) and reloads the preview; on epoch
+  3 color changes and CSS show in the preview before saving. Opening a section scrolls the
+  preview to it (top, middle or bottom of the page, the same in every epoch). The site's own
+  theme switcher is hidden in the preview, and epoch 0 pages get the admin theme's colors there.
+- A WAP preview for epoch −1: the WML deck is fetched and translated into a phone-sized screen -
+  text, links, soft keys, cards, and images through the PNG next to each WBMP. A deck that isn't
+  well-formed XML is still shown, under a warning.
+- A lightweight code editor for every raw-code field (theme CSS, banner and footer markup):
+  line numbers, syntax colors from the theme's code palette, current line, Tab/Shift+Tab indent,
+  smart Enter, Ctrl+S save, Ctrl+/ comment, Ctrl+G go to line, unsaved-changes warning. No
+  library: `html/assets/js/code-editor.js` lays the textarea over a colored copy of its text.
+  Brackets and quotes are never auto-closed.
+- Home blog background images for epoch 2 and 3: one for the list and one for each item (over
+  its background color). `themes.home_blog_background` / `home_blog_item_background`.
+- Uploaded images show as a file list - thumbnail, name, *Copy URL*, *Delete* - on banner and
+  footer panels and on the single-image fields (logo, home blog); deleting a field's image also
+  clears and saves the field.
+
+**Changed**
+- An epoch 3 stylesheet is no longer replaced: the dashboard saves a **customization layer**
+  appended after the theme's file (`css_custom_epoch3` / `css_admin_custom_epoch3`), so it holds
+  only what changed and theme updates still reach the site. The CSS page shows the layer and,
+  read-only, the original; *Restore original* is now *Discard my changes*.
+- Theme uploads moved from the theme's `assets/` - overwritten by an update - to
+  `html/content/themes/<key>/<banner|footer|logo|home-blog>/epoch<N>/`. The upload widgets no
+  longer list or delete the images a theme ships.
+- Epoch −1 uploads (every component, not just the logo) take a PNG only; the server keeps it and
+  writes its WBMP twin (`logo.png` → `logo.wbmp`) for real devices.
+- The color form is split by section in the customizer (Navbar; Content: body, links, home
+  content; Home blog; Footer; Data colors: table and code blocks), each field shown only for the
+  epochs that use it.
+- `/dashboard/settings/themes/<key>` redirects to the customizer; the themes list links
+  *Customize*. Saving colors and *Set active* return there.
+- Banner/footer panels: *Save markup* under the editor, then an *Images* block with its own
+  *Upload*.
+
+**Fixed**
+- The epoch −1 logo `<img>` was not self-closed, so `/menu` and every page with a footer logo
+  were invalid WML.
+- An epoch −1 upload was named `logo.png.wbmp` and its PNG deleted.
+- Transparent pixels came out black in a WBMP; transparency is now laid over white.
+- Epoch 1/2 logo images (navbar and footer) get `border="0"`, so old browsers draw no link border.
+- The color picker's popover was clipped by scrolling containers; it is now fixed to the window.
+
+**Removed**
+- The `css_epoch3` / `css_admin_epoch3` fields (full replacements) are no longer read.
+- The one-theme page (`settings-theme_epoch3.html`, `site_settings_theme_page()`), now the
+  customizer.
+
+**Docs**
+- [themes.md](develop_docs/reference/themes.md): home blog backgrounds, the CSS layer, the code
+  editor, theme uploads and WBMP twins, the customizer. Routes, dashboard, data model, templates
+  catalog, security and README updated to match.
+
+### 2026-10-06
+### One page per theme
 
 **Changed**
 - `/dashboard/settings/themes` is now a list of the themes (name, *Active* or *Set active*,
@@ -21,7 +216,7 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *A
   clicked on. The banner, footer, logo and CSS editors link back to their theme in the
   breadcrumb.
 
-### 2026-10-06 - Page content background
+### Page content background
 
 **Added**
 - `page-content-background` theme color (with opacity), in the panel's *Body* group: the
@@ -31,7 +226,7 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *A
 - `.boat-rudder-page-entry` (blog posts and pages) uses the same background, with a
   `24px 32px` padding (`16px` on phones) so its text doesn't touch the edge of the box.
 
-### 2026-10-06 - Admin design tokens and components
+### Admin design tokens and components
 
 **Added**
 - Five theme colors for the admin, in the panel's *Body* group: text, secondary text, panel
@@ -65,7 +260,7 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *A
   on specificity); it now uses the code block's colors.
 - Links styled as buttons took the public `a:link` color instead of the button's.
 
-### 2026-10-06 - Public and admin stylesheets per theme
+### Public and admin stylesheets per theme
 
 **Changed**
 - Each theme's epoch 3 CSS is split in two: `styles_epoch3.css` (public site, every page) and
@@ -86,7 +281,7 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *A
 - Unescaped `%` in five templates rendered through printf (`home-content_epoch2.html`, the
   image block's size options, two editor scripts) - undefined behavior that ASan flagged.
 
-### 2026-10-06 - BEM CSS class names
+### BEM CSS class names
 
 **Changed**
 - Every CSS class is now BEM with the `boat-rudder-` prefix
@@ -113,7 +308,7 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *A
 - `scripts/check_css_bem.py`: fails on non-BEM classes, leftover `boat-rudder__` names, or class
   attributes on epochs without a stylesheet.
 
-### 2026-10-06 - Dashboard usability
+### Dashboard usability
 
 **Added**
 - Charts in the dashboard's analytics summary, drawn as inline SVG on the server (no JavaScript,
@@ -145,7 +340,7 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *A
 - Light theme: dashboard forms had a near-black background behind dark labels.
 - Menu list rows closed `</td>` before `</div>`.
 
-### 2026-10-06 - Dashboard security fixes
+### Dashboard security fixes
 
 **Added**
 - New dashboard home: option groups (Content / Site / Administration / Account, with a link to the
@@ -177,7 +372,7 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *A
   (e.g. `photo.png -> photo_half.gif`), which was left behind.
 - `media.author_username` is sanitized the same way as the upload directory name.
 
-### 2026-10-06 - WAP gateway, code highlighting, QR short links (`7c55aef`)
+### WAP gateway, code highlighting, QR short links (`7c55aef`)
 
 **Added**
 - WAP 1.x gateway (`src/wap_gateway/`): UDP listener with Palm Rover WTP (49300) and

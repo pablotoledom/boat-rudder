@@ -265,7 +265,7 @@ h3 {
   width: 100%;
   display: flex;
   background-color: var(--br-color-body-background, #8dd3ff);
-  background-image: url('/themes/light/assets/blog-list/matrix-grid_epoch3.gif');
+  background-image: url('/themes/light/assets/blog-list/matrix-grid_epoch3.jpg');
   background-repeat: repeat-y;
   display: flex;
   justify-content: center;
@@ -645,6 +645,7 @@ a.boat-rudder-social-network img { border-radius: 4px; flex-shrink: 0; }
   border-right: 1px solid var(--br-color-code-line-number);
   color: var(--br-color-code-line-number);
   text-align: right;
+  -webkit-user-select: none;  /* Safari has only the prefixed one */
   user-select: none;
 }
 
@@ -698,7 +699,6 @@ a.boat-rudder-social-network img { border-radius: 4px; flex-shrink: 0; }
   font-size: 18px;
   line-height: 26px;
   margin: 16px 0;
-  overflow: scroll;
 }
 .boat-rudder-paragraph--lead {
   font-size: 18px;

@@ -44,10 +44,11 @@ int generate_qr_wbmp(const char *text, const char *fs_path);
 char *generate_qr_halfblock_text(const char *text);
 
 // Same idea as generate_qr_halfblock_text() - two QR rows packed into one
-// text row - but for EPOCH_PRESTANDARD's one real pre-Unicode reader, Cello
-// (see utils/request_charset.h and detect_epoch.c's own note on why it's
-// classified there despite that), which can't render the Unicode half-block
-// glyphs any more than it can decode any other multi-byte UTF-8. Emits the
+// text row - but for EPOCH_PRESTANDARD's pre-Unicode readers: Cello (see
+// utils/request_charset.h and detect_epoch.c's own note on why it's
+// classified there), the CERN Line Mode Browser and HTTP/0.9 clients -
+// none of which can render the Unicode half-block glyphs any more than
+// they can decode any other multi-byte UTF-8. Emits the
 // UTF-8 encoding of Latin-1 code points U+00DB/U+00DC/U+00DF - not because
 // the QR wants those actual letters (Û/Ü/ß), but because utf8_to_latin1()
 // transcodes them down to exactly the byte values (0xDB/0xDC/0xDF) that

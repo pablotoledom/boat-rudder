@@ -1448,75 +1448,128 @@
     setContentChanged();
   };
 
-  /* ---- Gallery block ---- */
+  /* ---- Gallery block ----
+     The body lists the photos as numbered tiles, in gallery order: drag a
+     tile or use its arrows to move it, x removes it, and the last tile adds
+     more from the media library - appended, never replacing. Every change
+     rewrites the block's text fields ("url;url;...", the same value in every
+     language) and refreshes the preview. */
   function initGalleryBlock(block) {
     var gp = block.querySelector('.boat-rudder-entry-editor__gallery-preview');
     if (!gp) return;
     var panel = block.querySelector('.boat-rudder-entry-editor-block__lang-content[data-lang="' + currentLang + '"]');
     var tf = panel ? panel.querySelector('[name="text"]') : null;
-    if (tf && tf.value) renderGalleryThumbs(gp, tf.value);
+    renderGalleryThumbs(gp, tf ? tf.value : '');
+  }
+
+  function galleryUrls(value) {
+    return (value || '').split(';')
+      .map(function (u) { return u.trim(); })
+      .filter(Boolean);
+  }
+
+  function galleryItems(container) {
+    return Array.from(container.querySelectorAll('.boat-rudder-entry-editor-gallery__item'));
   }
 
   window.renderGalleryThumbs = function (container, value) {
+    var urls = galleryUrls(value);
+    var iconBtn = 'boat-rudder-btn boat-rudder-btn--ghost boat-rudder-btn--icon';
     container.innerHTML = '';
-    if (!value || !value.trim()) {
-      container.innerHTML = '<span class="boat-rudder-entry-editor__gallery-empty">No images selected</span>';
-      return;
-    }
-    value.split(';').forEach(function (url) {
-      url = url.trim();
-      if (!url) return;
-      var img = document.createElement('img');
-      img.src = url.replace(/(\.jpg|\.jpeg|\.gif|\.png)$/i, '_small$1');
-      img.className = 'boat-rudder-entry-editor__gallery-thumb';
-      img.alt = '';
-      img.draggable = true;
-      img.dataset.url = url;
-      container.appendChild(img);
+    urls.forEach(function (url, i) {
+      var item = document.createElement('div');
+      item.className = 'boat-rudder-entry-editor-gallery__item';
+      item.draggable = true;
+      item.dataset.url = url;
+      item.innerHTML =
+        '<img class="boat-rudder-entry-editor-gallery__thumb" alt="" src="' +
+          escapeHtml(url.replace(/(\.jpg|\.jpeg|\.gif|\.png)$/i, '_small$1')) + '">' +
+        '<span class="boat-rudder-entry-editor-gallery__index">' + (i + 1) + '</span>' +
+        '<div class="boat-rudder-entry-editor-gallery__actions">' +
+          '<button type="button" class="' + iconBtn + '" data-gallery-action="earlier" title="Move earlier"' +
+            (i === 0 ? ' disabled' : '') + '>&#8592;</button>' +
+          '<button type="button" class="' + iconBtn + '" data-gallery-action="later" title="Move later"' +
+            (i === urls.length - 1 ? ' disabled' : '') + '>&#8594;</button>' +
+          '<button type="button" class="' + iconBtn + ' boat-rudder-entry-editor-gallery__remove" data-gallery-action="remove"' +
+            ' title="Remove from the gallery">&times;</button>' +
+        '</div>';
+      container.appendChild(item);
     });
-    initGalleryThumbDragDrop(container);
+
+    var add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'boat-rudder-entry-editor-gallery__add boat-rudder-btn boat-rudder-btn--ghost';
+    add.dataset.galleryAction = 'add';
+    add.textContent = urls.length ? '+ Add photos' : '+ Select photos';
+    container.appendChild(add);
+
+    // Listeners live on the container, which outlives every re-render:
+    // attached once, they never stack up.
+    if (!container.dataset.galleryReady) {
+      initGalleryTiles(container);
+      container.dataset.galleryReady = '1';
+    }
   };
 
-  function initGalleryThumbDragDrop(container) {
-    var draggingThumb = null;
+  function initGalleryTiles(container) {
+    container.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-gallery-action]');
+      if (!btn || !container.contains(btn) || btn.disabled) return;
+      e.stopPropagation();
+      var action = btn.dataset.galleryAction;
+      if (action === 'add') { openGalleryForBlock(btn); return; }
+
+      var item = btn.closest('.boat-rudder-entry-editor-gallery__item');
+      if (!item) return;
+      if (action === 'remove') {
+        item.remove();
+      } else if (action === 'earlier' && item.previousElementSibling) {
+        item.previousElementSibling.before(item);
+      } else if (action === 'later') {
+        var next = item.nextElementSibling;
+        if (next && next.classList.contains('boat-rudder-entry-editor-gallery__item')) next.after(item);
+      }
+      syncGalleryInput(container);
+    });
+
+    var dragging = null;
     container.addEventListener('dragstart', function (e) {
-      draggingThumb = e.target.closest('.boat-rudder-entry-editor__gallery-thumb');
-      if (!draggingThumb) return;
+      dragging = e.target.closest('.boat-rudder-entry-editor-gallery__item');
+      if (!dragging) return;
       e.dataTransfer.effectAllowed = 'move';
-      setTimeout(function () { if (draggingThumb) draggingThumb.classList.add('boat-rudder-entry-editor__gallery-thumb--dragging'); }, 0);
+      e.dataTransfer.setData('text/plain', dragging.dataset.url);
+      setTimeout(function () { if (dragging) dragging.classList.add('boat-rudder-entry-editor-gallery__item--dragging'); }, 0);
     });
     container.addEventListener('dragend', function () {
-      if (draggingThumb) draggingThumb.classList.remove('boat-rudder-entry-editor__gallery-thumb--dragging');
-      container.querySelectorAll('.boat-rudder-entry-editor__gallery-thumb').forEach(function (img) { img.classList.remove('boat-rudder-entry-editor__gallery-thumb--drag-over'); });
-      draggingThumb = null;
+      if (dragging) dragging.classList.remove('boat-rudder-entry-editor-gallery__item--dragging');
+      dragging = null;
+      syncGalleryInput(container);
     });
-    container.addEventListener('dragenter', function (e) { e.preventDefault(); });
     container.addEventListener('dragover', function (e) {
+      if (!dragging) return;
       e.preventDefault();
-      if (!draggingThumb) return;
-      var target = e.target.closest('.boat-rudder-entry-editor__gallery-thumb');
-      if (!target || target === draggingThumb) return;
-      container.querySelectorAll('.boat-rudder-entry-editor__gallery-thumb').forEach(function (img) { img.classList.remove('boat-rudder-entry-editor__gallery-thumb--drag-over'); });
-      target.classList.add('boat-rudder-entry-editor__gallery-thumb--drag-over');
-      var imgs = Array.from(container.querySelectorAll('.boat-rudder-entry-editor__gallery-thumb'));
-      if (imgs.indexOf(draggingThumb) < imgs.indexOf(target)) target.after(draggingThumb);
-      else target.before(draggingThumb);
+      var target = e.target.closest('.boat-rudder-entry-editor-gallery__item');
+      if (!target || target === dragging) return;
+      var items = galleryItems(container);
+      if (items.indexOf(dragging) < items.indexOf(target)) target.after(dragging);
+      else target.before(dragging);
     });
     container.addEventListener('drop', function (e) {
-      e.preventDefault();
-      syncGalleryInput(container);
+      if (dragging) e.preventDefault();
     });
   }
 
   function syncGalleryInput(container) {
     var block = container.closest('.boat-rudder-entry-editor-block');
     if (!block) return;
-    var urls = Array.from(container.querySelectorAll('.boat-rudder-entry-editor__gallery-thumb'))
-      .map(function (img) { return img.dataset.url; })
+    var joined = galleryItems(container)
+      .map(function (item) { return item.dataset.url; })
       .filter(Boolean).join(';');
     block.querySelectorAll('.boat-rudder-entry-editor-block__lang-content [name="text"]').forEach(function (tf) {
-      tf.value = urls;
+      tf.value = joined;
     });
+    renderGalleryThumbs(container, joined);   // renumber, re-enable the arrows
+    refreshBlockPreview(block);
     setContentChanged();
   }
 

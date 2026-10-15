@@ -13,20 +13,44 @@ route), [templates-catalog.md](templates-catalog.md) (every template and its arg
 
 ## Retro-Compatible CMS (epoch-based rendering)
 
-The `/` route is rendered dynamically instead of being served as a static file. The goal is to send each
-client the simplest markup its browser can handle, from WAP-era phones to modern HTML5/CSS3 browsers.
+Every dynamic route (`/`, `/blog`, `/page/<link>`, ...) is rendered on the fly instead of being served as
+a static file. The goal is to send each client the simplest markup its browser can handle, from the
+first web browsers of 1991 (HTTP/0.9, plain text), through HTML 3.2 and HTML 4 browsers and WAP
+phones, to modern HTML5/CSS3 browsers.
 
 ### Epochs
 
-`utils/detect_epoch.c` classifies the `User-Agent` header into one of five epochs:
+`utils/detect_epoch.c` classifies the `User-Agent` header into one of five epochs. What each one
+is, technically - protocol, encoding, HTML, CSS and JS level, full-fidelity floor - is
+[epochs.md](epochs.md):
 
 | Epoch | Constant | Target | `Content-Type` |
 |---|---|---|---|
 | -1 | `EPOCH_WML` | WAP 1.x phones | `text/vnd.wap.wml` |
-| 0 | `EPOCH_PRESTANDARD` | Text browsers (e.g. Lynx, w3m, ELinks) - and Cello | `text/html; charset=UTF-8` (bare `text/html` for Cello) |
-| 1 | `EPOCH_EARLY` | Old browsers (table layouts, `<font>`) | `text/html` |
-| 2 | `EPOCH_MIDDLE` | Netscape 4 / MSIE 5 era - table layout, no external stylesheet | `text/html; charset=UTF-8` |
-| 3 | `EPOCH_MODERN` | Modern HTML5 + CSS3 | `text/html; charset=UTF-8` |
+| 0 | `EPOCH_PRESTANDARD` | Text browsers (e.g. Lynx, w3m, ELinks), Cello, the CERN Line Mode Browser, any HTTP/0.9 client | `text/html; charset=UTF-8` (bare `text/html` for Cello, Line Mode and HTTP/0.9) |
+| 1 | `EPOCH_EARLY` | Mosaic, Netscape 1-2, MSIE ≤ 3 (table layouts, `<font>`) | `text/html` |
+| 2 | `EPOCH_MIDDLE` | Netscape 3-4, MSIE 4-11, EdgeHTML, Opera 5-12, and anything below epoch 3's floors - table layout, no external stylesheet | `text/html; charset=UTF-8` |
+| 3 | `EPOCH_MODERN` | Chrome 87+, Firefox 66+, Safari 14.1+ / iOS 14.5+ | `text/html; charset=UTF-8` |
+
+Epoch 3's floors come from its stylesheet, not from the browser's age: the newest CSS that
+`styles_epoch3.css` relies on is `gap` on flex containers and `inset`, which reached all three
+engines in Chrome 87, Firefox 66 and Safari 14.1. Below them the page breaks rather than degrades
+(custom properties, older still, carry every color), so those browsers get epoch 2.
+
+The classification is **data, not code**: an ordered list of rules - tokens the `User-Agent` must
+contain (and must not), the token a version follows, and version tiers giving an epoch and whether
+the browser may use the dashboard - edited from `/dashboard/settings/browsers`
+([dashboard.md](dashboard.md)) and stored in `browser_detection`
+([data-model.md](data-model.md#browser_detection)). Raise a tier there when the stylesheet adopts
+something newer; no recompiling. The rules are held in memory (loaded at startup and after each
+save), so detection never touches the database. Until an admin saves rules of their own, the
+factory rules in `detect_epoch.c` apply - the chain described here. The order of the rules matters, because most modern `User-Agent`s carry
+several engines' tokens: `MSIE`, `Trident/` and EdgeHTML's `Edge/` are tested before `Chrome/`;
+iOS before everything WebKit, since every iOS browser is the system WebKit and only Safari says
+`Version/` (CriOS and FxiOS don't), so the iOS version decides; and a `Mozilla/5` string no engine
+claimed (Konqueror, a legacy crawler) gets epoch 2. The factory test cases - ~50 real
+`User-Agent`s, one per family and version boundary - run in `tests/detect_epoch_test.c`
+(`ctest --test-dir build/debug`) and are the dashboard page's starting test cases.
 
 Epoch 1 (and WML) get a bare `Content-Type: text/html` with **no** `charset` parameter, on
 purpose - live-tested against real NCSA Mosaic 2.1.1, which matches `Content-Type` against its
@@ -35,7 +59,8 @@ known type shows "Undefined Viewer for MIME Type" instead of the page. Epoch 0's
 reader is a modern terminal emulator (Lynx/w3m/ELinks running today in a UTF-8 locale) rather
 than a genuinely pre-Unicode machine, so it keeps a normal UTF-8 declaration; epoch 1 and WML
 predate UTF-8 outright and are transcoded to Latin-1 instead - see "Character encoding" below,
-which also covers the one real pre-Unicode browser classified into epoch 0 (Cello).
+which also covers the genuinely pre-Unicode readers classified into epoch 0 (Cello, the Line Mode
+Browser, HTTP/0.9 clients).
 
 Which epoch renders a request is decided by `resolve_epoch()` (`http_router.c`): `force_epoch`
 from the config if set, otherwise a valid `?preview_epoch=N` (the dashboard's preview iframe -
@@ -87,12 +112,16 @@ Everything around it is identical for every page of an epoch, so it lives once p
 | `layout/layout_epoch<N>.html` | doctype, head, `<body>`, `{{PAGE_TITLE}}`, `{{CONTENT}}` |
 | `layout/footer_epoch<N>.html` | the site footer |
 | `layout/lightbox_epoch3.html` | epoch 3 gallery viewer |
+| `layout/body-backdrop_epoch2.html` | the `<body>` backdrop attribute, for the pages that ask for it |
 
 `page_layout_wrap()` (`src/html_builder/page_layout.c`) does the assembly. A fragment opts into a
 part by carrying its marker - `{{FOOTER}}`, `{{LIGHTBOX}}` - and a part with no
 file for that epoch resolves to nothing, so the retro epochs drop the epoch-3 viewers without
-needing an empty file each. `{{BODY_BACKGROUND}}` fills the one attribute that differs between
-epoch-2 pages: home and the blog listing carry the tiled backdrop, content pages do not.
+needing an empty file each. The one part that is not spliced where its marker stands is the
+epoch-2 backdrop: it is an attribute of the layout's `<body>`, so a fragment asks for it with
+`{{BODY_BACKDROP}}` (home and the blog listing do, content pages don't), the marker is removed,
+and the theme's `layout/body-backdrop_epoch2.html` fills the layout's `{{BODY_BACKGROUND}}`.
+Which pages carry a backdrop, and which image, is template content - nothing in C names either.
 
 Two practical consequences. Adding a part to every page of an epoch is a one-file edit, not
 fourteen. And because the `layout/` files are substituted textually rather than through
@@ -191,7 +220,7 @@ Each visual component has one HTML template per epoch, named `<component>_epoch<
   `gallery-page-thumbstrip_epoch{1,2}.html` (one `%s` wrapping the thumbnail rows) and
   `gallery-page-thumb_epoch{1,2}.html`; epoch 3 uses a `gallery-page-item_epoch3.html` grid.
   Epochs -1/0 render `gallery-page-qr_epoch<N>.html` instead - a QR code (WBMP image for WML,
-  Unicode half-block `<pre>` art for epoch 0, Latin-1 block art for Cello - see "Character
+  Unicode half-block `<pre>` art for epoch 0, Latin-1 block art for its pre-Unicode readers - see "Character
   encoding" below for why they need different renderings) encoding a short `/qr/<code>` link to
   the gallery (`public_url`-based when configured - see
   [qr-and-short-links.md](qr-and-short-links.md)), plus that URL again as a plain text link -
@@ -495,10 +524,9 @@ are generated by `scripts/image-optimizer.sh`, and the renderer appends the one 
 
 Epoch 1 gets GIFs because HTML 3.2 browsers cannot display JPEG reliably.
 
-The optimizer also creates a base-name symlink pointing at `_half` so a bare URL resolves on
-its own, but **that covers only images run through the script** - images uploaded through the
-media dashboard have no symlink (13 of 754 files in the reference site). Renderers must
-therefore always append a variant rather than rely on the bare path resolving.
+No file exists under the bare path: the optimizer keeps only the five variants (older uploads may
+still have a base-name symlink to `_half`, which nothing relies on). Renderers must therefore
+always append a variant (`image_url_variant()`) - the bare path never resolves on its own.
 
 Clicking an image opens it at full size: epoch 3 hands it to the same lightbox the galleries
 use (any `img[data-full]` on the page joins that viewer, so gallery items and standalone
@@ -550,12 +578,26 @@ garbled text instead of decoding them, since HTTP/0.9 (1991) predates images/MIM
 entirely. `serve_static_file()` (`http_router.c`) now always sends a full status line and headers,
 regardless of which request style triggered it.
 
+Pages are the other way round. A **genuine** HTTP/0.9 client - WorldWideWeb (1990), the early Line
+Mode Browser, ViolaWWW, Erwise - sends the version-less line and *no headers at all*, and shows
+whatever arrives as the document: a status line and headers would print as the top of the page.
+For that request (`is_http09_request()`: no version **and** no headers) the router sets the
+connection's `simple_response` flag, and `connection_write()` drops everything up to the blank
+line ending the header block - the RFC 1945 Simple-Response - for every dynamic page and error
+page. The static-file branch clears the flag first, so files keep their headers as above (Cello's
+version-less image fetches). Such a request has no `User-Agent` to classify, so
+`resolve_epoch()` gives it **epoch 0** (after `force_epoch` / `?preview_epoch`), in Latin-1 (see
+below). A browser older than HTML 2.0 still reads it: HTML's rule since 1991 is that unknown tags
+are ignored and their text shown, so what epoch 0 uses beyond the 1991-92 tag set (`html`/`head`/
+`body`, `hr`, `br`, `b`, `i`, `pre`) costs formatting, never content.
+
 ### Character encoding
 
-Epoch 1, WML, and Cello in epoch 0.
+Epoch 1, WML, and the pre-Unicode readers of epoch 0: Cello, the CERN Line Mode Browser
+(`LineMode/`, `W3CLineMode/`) and any HTTP/0.9 client (`request_charset.c`).
 
 Every stored/authored string in the CMS is UTF-8, but UTF-8 wasn't defined until 1993 and didn't
-reach the web until HTML 4 (1997) - epoch 1 (NCSA Mosaic, Cello) and WML predate it entirely and
+reach the web until HTML 4 (1997) - epoch 1 (NCSA Mosaic), Cello and WML predate it entirely and
 assume ISO-8859-1, HTTP's own default charset (RFC 1945/2616). Handed raw UTF-8 bytes with no
 matching charset, they render each encoded character as two/three separate Latin-1 glyphs (e.g.
 "SÃguenos" for "Síguenos") - confirmed live in both a real NCSA Mosaic build and a WAP emulator.
@@ -567,18 +609,20 @@ prolog additionally declares `encoding="ISO-8859-1"` (`layout_epoch-1.html` and 
 shells) - without it, a compliant XML parser defaults to assuming UTF-8 and rejects the very
 Latin-1 bytes the transcode just produced as invalid.
 
-Epoch 0 is deliberately **not** included in this transcode, even though it shares the "text-only"
-label with epoch 1: its realistic reader today is a terminal browser (Lynx/w3m/ELinks) running in
-a UTF-8 locale, not a genuinely pre-Unicode machine, so it keeps plain UTF-8 - see the epoch table
-above. This is also why QR codes are drawn differently per epoch: epoch 0's Unicode half-block
+Epoch 0 is **not** transcoded by default, even though it shares the "text-only" label with epoch
+1: its usual reader today is a terminal browser (Lynx/w3m/ELinks) running in a UTF-8 locale, not a
+genuinely pre-Unicode machine, so it keeps plain UTF-8 - see the epoch table above - except for the
+pre-Unicode readers below. This is also why QR codes are drawn differently per epoch: epoch 0's Unicode half-block
 art (two QR modules packed into one terminal row, correcting for a monospace cell being taller
 than it is wide) assumes the UTF-8 terminal that epoch actually targets, while epoch 1/WML get a
 GIF/WBMP image instead.
 
-**The Cello exception (`request_charset`).** Cello (1993) is a genuinely pre-Unicode GUI browser,
-but it lands in epoch 0 because its feature set (no dependable inline images) matches epoch 0's
-templates, not epoch 1's. `request_charset_set(User-Agent)` (`src/utils/request_charset.c`)
-records, per request, whether the **real** browser needs the Latin-1 downgrade. When it does,
+**The pre-Unicode exception (`request_charset`).** Three readers of epoch 0 predate UTF-8: Cello
+(1993), a GUI browser that lands in epoch 0 because its feature set (no dependable inline images)
+matches epoch 0's templates, not epoch 1's; the CERN Line Mode Browser (`LineMode/`,
+`W3CLineMode/`); and any HTTP/0.9 client, which sends no `User-Agent` at all.
+`request_charset_set(User-Agent, http09)` (`src/utils/request_charset.c`) records, per request,
+whether the **real** browser needs the Latin-1 downgrade. When it does,
 `build_epoch_response.c` transcodes epoch 0 bodies too, sends bare `text/html`, and the QR
 generators switch to `generate_qr_asciiblock_text()` - Latin-1 `Û Ü ß`, which become the CP437
 block glyphs `0xDB/0xDC/0xDF` in the "Terminal" font. This flag deliberately ignores
@@ -658,7 +702,7 @@ applies, in order:
 | WML pagination | −1, unless `?wml_pages=all` | `wml_paginate()` - see below |
 | Theme re-tagging | 1, 2 | `?theme=<key>` on every site-relative link |
 | WML fixups | −1 | `<br>` → `<br/>`, HTML lists → `- item<br/>` lines |
-| Latin-1 transcode | −1, 1, and 0 for Cello | `utf8_to_latin1()` |
+| Latin-1 transcode | −1, 1, and 0 for Cello, Line Mode and HTTP/0.9 | `utf8_to_latin1()` |
 
 Then it adds the epoch's `Content-Type`, `X-Content-Type-Options` and `X-Frame-Options`, and any
 extra headers the route passed (e.g. `Cache-Control: no-store` for drafts). Redirects

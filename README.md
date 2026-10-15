@@ -2,8 +2,10 @@
 
 A self-contained HTTP/HTTPS server written in **C17** that doubles as a **retro-compatible
 CMS**: every dynamic page is rendered on the fly into the simplest markup the requesting browser
-can understand - from 1990s WAP phones to modern HTML5/CSS3 - while every other path is served
-as a plain static file. A built-in WAP 1.x gateway even lets real vintage phones browse the site.
+can understand - from the first web browsers of 1991 (HTTP/0.9, plain text), through the
+Mosaic and Netscape years and WAP phones, to modern HTML5/CSS3 - while every other path is
+served as a plain static file. A built-in WAP 1.x gateway even lets real vintage phones browse
+the site.
 
 External dependencies: **OpenSSL** for the server itself; **libmongoc** and **libsodium** for
 the database-backed CMS and the dashboard; **libqrencode** for QR codes on retro browsers;
@@ -29,25 +31,37 @@ the default until a site overrides it.
 - Configurable anti-DDoS: per-IP rate limiting with temporary bans, a global connection cap,
   `429` responses, slow-loris timeouts.
 - Trusted-proxy-aware `X-Real-IP` / `X-Forwarded-For` handling.
-- **Retro-compatible CMS**: dynamic routes are classified into one of 5 browser "epochs"
-  (WAP/WML, plain text, HTML 3.2, HTML4+CSS1, HTML5+CSS3) and assembled from epoch-specific
-  templates.
+- **Retro-compatible CMS**: dynamic routes are classified into one of 5 browser "epochs" and
+  assembled from epoch-specific templates:
+  - **Text** (epoch 0, 1991-): HTTP/0.9 and up, a subset of HTML 2.0 that even a pre-HTML 2.0
+    browser reads as text - Line Mode Browser, Lynx, Cello.
+  - **Early** (epoch 1, 1993-96): HTML 3.2 tables and `<font>`, no CSS or JS - Mosaic, Netscape 2.
+  - **Middle** (epoch 2, 1997-2006): HTML 4.01 and inline CSS1 - Netscape 4, Internet Explorer 5.
+  - **WAP** (epoch −1, 1999-2005): WML 1.1 - Nokia 7110, UP.Browser.
+  - **Modern** (epoch 3, 2021-): HTML5, CSS3, ES2015 - current browsers.
+
+  Browsers are assigned by User-Agent rules editable from the dashboard. Full specification:
+  [develop_docs/reference/epochs.md](develop_docs/reference/epochs.md).
 - **MongoDB-backed content**: entries (pages and blog posts, with drafts) built from 13 typed
   content blocks, categories, menu, per-visitor language selection, and a media library with
   automatic image variants.
 - **Retro degradation**: server-side syntax highlighting, QR codes (with short links) where an
   old browser can't show a video, image or gallery, Latin-1 output for pre-Unicode browsers,
-  WML paginated into single-packet pages.
+  header-less responses for HTTP/0.9 clients, WML paginated into single-packet pages.
 - **WAP 1.x gateway** (optional): serves the site as compiled WBXML over UDP to real WAP phones
   (via the external `trc-wap-relay`).
-- **Themes**: shared templates plus per-theme overrides, visitor theme selector, and
-  dashboard-editable colors, per-epoch banner/footer/logo (WBMP for WML), an editable epoch 3
-  stylesheet and a font library.
+- **Themes**: shared templates plus per-theme overrides and a visitor theme selector. A theme
+  customizer in the dashboard - pick an epoch, edit its logo, banner, colors, home blog
+  backgrounds and footer beside a live preview (WML translated for epoch −1) - plus a
+  customization layer over each epoch 3 stylesheet in a lightweight code editor, and a font
+  library. Uploads live in `html/content/themes/`, safe from updates; WML images are a PNG with
+  its WBMP twin.
 - **Analytics**: cookie-less per-day visit counts by epoch, browser, OS, country (optional
   GeoLite2) and route - no IP addresses stored.
-- **Dashboard** (modern browsers only): login with Argon2id, session cookies, two roles, an AJAX
-  entry editor with server-rendered previews and autosave, plus Categories / Languages / Menu /
-  Users / Media / Site settings (themes, logo, CSS, fonts, epoch preview) / Analytics.
+- **Dashboard** (recent browsers only: Chrome/Edge 111+, Firefox 121+, Safari 16.2+): login
+  with Argon2id, session cookies, two roles, an AJAX entry editor with server-rendered previews
+  and autosave, plus Categories / Languages / Menu / Users / Media / Site settings (themes,
+  logo, CSS, fonts, epoch preview, browser detection rules) / Analytics.
 
 For a full tour of the architecture and the CMS, see
 **[develop_docs/boat-rudder.md](develop_docs/boat-rudder.md)**.
@@ -144,13 +158,13 @@ boat-rudder/
 ├── html/                      # Static content root (CLI root directory)
 │   ├── templates/             # Shared templates
 │   ├── themes/<theme>/        # Per-theme templates, assets, public + admin epoch 3 CSS
-│   ├── assets/                # Site-wide assets (fonts, ...)
-│   └── content/               # Uploaded media, QR cache
+│   ├── assets/                # Site-wide assets (fonts, dashboard scripts)
+│   └── content/               # Uploaded media, theme uploads, QR cache
 ├── configs/settings.conf      # Runtime configuration
 ├── data/                      # Optional GeoLite2-Country.mmdb
 ├── ssl/                       # TLS certificate and key (optional)
-├── scripts/                   # Build/run/install scripts, systemd unit, logrotate,
-│   └── migrations/            # one-off mongosh data migrations
+├── scripts/                   # Build/run/install scripts, systemd unit, logrotate
+├── tests/                     # Unit tests (CTest): ctest --test-dir build/debug
 ├── CHANGELOG.md
 └── develop_docs/              # Project overview, reference docs, plans and diagrams
     ├── reference/             # Reference documentation (see below)
@@ -174,6 +188,7 @@ Reference (`develop_docs/reference/`):
 | [data-flow.md](develop_docs/reference/data-flow.md) | Step-by-step request data flow, startup and shutdown |
 | [routes.md](develop_docs/reference/routes.md) | Every route: method, guard, epochs, handler |
 | [data-model.md](develop_docs/reference/data-model.md) | Every MongoDB collection, relationships, indexes |
+| [epochs.md](develop_docs/reference/epochs.md) | Each epoch's technical spec: protocol, encoding, HTML/CSS/JS level, target browsers |
 | [rendering.md](develop_docs/reference/rendering.md) | Epochs, templates, the response layer, every public page |
 | [templates-catalog.md](develop_docs/reference/templates-catalog.md) | Every template, its arguments and markers |
 | [themes.md](develop_docs/reference/themes.md) / [fonts.md](develop_docs/reference/fonts.md) | Themes, site settings, font library |
@@ -186,7 +201,7 @@ Reference (`develop_docs/reference/`):
 | [code-highlighting.md](develop_docs/reference/code-highlighting.md) | Server-side syntax highlighting |
 | [configuration.md](develop_docs/reference/configuration.md) | Every `configs/settings.conf` key |
 | [security.md](develop_docs/reference/security.md) | Every defense and the known gaps |
-| [scripts.md](develop_docs/reference/scripts.md) / [migrations.md](develop_docs/reference/migrations.md) | Build/deploy scripts; data migrations |
+| [scripts.md](develop_docs/reference/scripts.md) | Build/deploy scripts |
 | [third-party.md](develop_docs/reference/third-party.md) | Vendored, ported and linked code and data |
 | [style-guide.md](develop_docs/reference/style-guide.md) | C coding style and security rules (Google C++ Style Guide + SEI CERT C), and BEM CSS class names |
 

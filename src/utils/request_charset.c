@@ -5,12 +5,12 @@
 // parameter.
 static __thread int needs_legacy_charset = 0;
 
-void request_charset_set(const char *user_agent) {
-    // Cello is the only browser detect_epoch.c carves out this way today -
-    // see that file's own note by name. Matched independently of epoch
-    // resolution (force_epoch/preview_epoch never touch this), straight off
-    // the request's real header.
-    needs_legacy_charset = (user_agent && strstr(user_agent, "Cello") != NULL);
+void request_charset_set(const char *user_agent, int http09) {
+    // The genuinely pre-Unicode readers of epoch 0, matched independently of
+    // epoch resolution (force_epoch/preview_epoch never touch this),
+    // straight off the request's real header.
+    needs_legacy_charset = http09 ||
+        (user_agent && (strstr(user_agent, "Cello") || strstr(user_agent, "LineMode")));
 }
 
 int request_needs_legacy_charset(void) {

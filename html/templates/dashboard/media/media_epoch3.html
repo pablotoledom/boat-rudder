@@ -182,11 +182,19 @@
     .catch(function (err) { console.error('Error:', err); alert(err.message); });
   };
 
-  window.selectDirectory = function (directoryId) {
+  // Empties the photo grid and loads its first page again - of one
+  // directory, or ("") of the latest uploads across all of them, the list
+  // the picker opens on. The infinite scroll pages on from there.
+  function reloadMediaGrid(directoryId) {
     window.contentEditorGalleryEnd = false;
-    var baseDir = document.getElementById('media-directory-selected');
     document.getElementById('media-content-start').value = '0';
     document.getElementById('media-content-end').value = String(MEDIA_PAGE);
+    document.getElementById('media-content-dynamically').innerHTML = '';
+    return getMediaContents(directoryId, 0, MEDIA_PAGE);
+  }
+
+  window.selectDirectory = function (directoryId) {
+    var baseDir = document.getElementById('media-directory-selected');
     if (baseDir) baseDir.value = directoryId;
 
     document.querySelectorAll('.boat-rudder-media__dir-item--selected')
@@ -199,8 +207,7 @@
     if (btnRename) btnRename.disabled = false;
     if (btnDelete) btnDelete.disabled = false;
 
-    document.getElementById('media-content-dynamically').innerHTML = '';
-    getMediaContents(directoryId, 0, MEDIA_PAGE);
+    reloadMediaGrid(directoryId);
   };
 
   window.renameDirectoryBtnHandler = function () {
@@ -272,11 +279,13 @@
     });
   }
 
-  // Re-lists the selected directory: a move/delete may succeed only for the
-  // images this user owns, so the grid is reloaded rather than pruned.
+  // Re-lists what the grid is showing after a move/delete - the selected
+  // directory, or the latest uploads when none is (how the picker opens). A
+  // move/delete may succeed only for the images this user owns, so the grid
+  // is reloaded rather than pruned.
   function refreshSelectedDirectory() {
     var current = document.getElementById('media-directory-selected');
-    if (current && current.value) window.selectDirectory(current.value);
+    reloadMediaGrid(current ? current.value : '');
   }
 
   // Media contents
@@ -536,8 +545,13 @@
     }
 
     if (window.contentEditorGalleryType === 'gallery-block' && window._galleryTargetBlock && selectedIds.length > 0) {
-      var joined = selectedIds.join(';');
+      // Added after the photos the gallery already has, in the order they
+      // were picked; a photo it already has isn't added twice.
       var galleryTextFields = window._galleryTargetBlock.querySelectorAll('.boat-rudder-entry-editor-block__lang-content [name="text"]');
+      var current = galleryTextFields.length
+        ? galleryTextFields[0].value.split(';').map(function (u) { return u.trim(); }).filter(Boolean)
+        : [];
+      var joined = current.concat(selectedIds.filter(function (id) { return current.indexOf(id) < 0; })).join(';');
       galleryTextFields.forEach(function (f) { f.value = joined; });
       var galleryPreview = window._galleryTargetBlock.querySelector('.boat-rudder-entry-editor__gallery-preview');
       if (galleryPreview && typeof renderGalleryThumbs === 'function') renderGalleryThumbs(galleryPreview, joined);

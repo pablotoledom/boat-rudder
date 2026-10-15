@@ -71,7 +71,7 @@ listeners serve the same site.
 | Theme keys (cookie, query, admin forms, asset API) | `theme_key_is_valid()`: charset `[A-Za-z0-9_-]` checked **before** touching the filesystem, then the directory must exist under `html/themes/` - blocks `../` and CRLF headed for `Set-Cookie` |
 | Open redirects (`return`, `back` parameters) | `language_sanitize_return()`: must start with a single `/` (no `//`, no `/\`), no control characters, `"`, `<`, `>`; anything else becomes `/` |
 | Uploaded file names (media, theme assets, fonts) | Whitelist `[A-Za-z0-9._-]`, spaces → `-`; theme assets and fonts also reject a leading `.` and any `..` |
-| Upload types | Theme assets: `.png/.jpg/.jpeg/.gif` (epoch −1: PNG/JPEG only, converted to WBMP). Fonts: `.ttf/.otf/.woff/.woff2`. Media library: `.jpg/.jpeg/.png/.gif/.webp` **and** matching magic bytes (`media_upload_is_allowed_image()`), else `415`; if `image-optimizer.sh` does not report a variant it wrote, the raw upload is deleted and `415` returned - the original is never published as-is |
+| Upload types | Theme assets: `.png/.jpg/.jpeg/.gif` (epoch −1: PNG only, kept with a WBMP twin), written under `html/content/themes/<key>/`; the home blog background fields are filenames re-sanitized server-side before going into a CSS `url()` / HTML attribute. Favicons: a structurally valid `.ico` only (ICONDIR header, every entry inside the file, ≤ 256 KiB), to the fixed names `html/favicon2.ico` / `favicon3.ico`. Fonts: `.ttf/.otf/.woff/.woff2`. Media library: JPEG, PNG, GIF or WebP **by magic bytes** (`media_image_extension()`), else `415`; the stored name gets that format's extension (`media_name_with_extension()`: a WebP sent as `photo.jpg` is stored as `photo.webp`), so name and content always agree. The name itself keeps only `[A-Za-z0-9_-]` plus the extension dot (`media_sanitize_upload_name()`), and an existing name gets `_2`, `_3`... instead of overwriting another upload's files; if `image-optimizer.sh` does not report a variant it wrote, the raw upload is deleted and `415` returned - the original is never published as-is |
 | Media directory names | `media_dir_name_valid()`: 3-60 chars `[A-Za-z0-9_-]` (no `/`, no `.`), on create **and** rename; names read back from the DB are re-checked before they reach the filesystem or the optimizer's command line |
 | Media paths on disk | Built only from DB records - directory name + the **owner's** username (`media_username_valid()` rejects `""`, `.`, `..`, leading dots) - never from a client-supplied name or path. A legacy record that fails the checks is left alone on disk |
 | Optimizer invocation | `popen()` with single-quoted arguments; every component (username, directory, file name) is restricted to `[A-Za-z0-9._-]`, so the quoting can't be broken |
@@ -95,7 +95,8 @@ listeners serve the same site.
 | Logout | `POST /logout` (CSRF-checked whenever a session cookie is present; `GET` → `405`) deletes the session document and clears the cookie |
 | Expiry | Checked on every lookup (`validate_session()`). At startup `session_manager_ensure_indexes()` creates a TTL index `{expires_at: 1}, {expireAfterSeconds: 0}` (MongoDB then purges expired sessions about once a minute), a unique index on `token`, and deletes the backlog of already-expired sessions |
 | CSRF | Every non-`GET`/`HEAD`/`OPTIONS` request through `require_dashboard_session()` (i.e. every dashboard write) must carry the session's CSRF token, else `403`. See [CSRF protection](#csrf-protection) |
-| Modern browsers only | `/login` POST and every `/dashboard*` route require epoch 3 (server-side, not just hidden links) |
+| Modern browsers only | `/login` POST and every `/dashboard*` route require epoch 3 *and* the `dashboard` flag the browser detection rules give the real `User-Agent` (`dashboard_allowed()`, server-side, not just hidden links) - so `?preview_epoch=3` cannot lift an older browser in. Other epoch 3 browsers see "needs a more recent browser" |
+| Detection rules lock-out | Saving browser detection rules is refused (`409`) when the saving browser would lose the dashboard under them. Last resort: delete the `browser_detection` document and restart - the factory rules apply |
 | MongoDB down | Dashboard and login answer `503`, never "logged in" |
 
 ### Roles
@@ -185,7 +186,7 @@ accepted forever.
 | Former gap | Fix |
 |---|---|
 | Media directory rename/delete built paths from the client's `oldname`/`newname`/`dirname` (`../` reached outside `html/`, with the service running as root) | Paths come from the `media_directories` record and its owner; `newname` must pass `media_dir_name_valid()`; duplicates `409`; non-empty directories `409`; the record is deleted only after a successful `rmdir()` - see [Request handling](#request-handling), [Media ownership](#media-ownership) |
-| Media uploads accepted any extension (stored XSS via `.html`/`.svg`) | Extension + magic-byte allowlist, and only optimizer output is kept |
+| Media uploads accepted any extension (stored XSS via `.html`/`.svg`) | Magic-byte allowlist that also sets the stored extension, and only optimizer output is kept |
 | No ownership checks in the media library | `media_can_manage()` on every media write |
 | No CSRF tokens (relied on `SameSite=Lax` only) | Session-bound token checked in `require_dashboard_session()` - [CSRF protection](#csrf-protection) |
 | Expired sessions never purged | TTL index + startup purge (`session_manager_ensure_indexes()`) |

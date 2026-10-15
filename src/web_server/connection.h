@@ -8,6 +8,14 @@
 typedef struct {
     int   client_socket;
     SSL  *ssl;              // NULL → plain TCP, non-NULL → TLS session
+    // HTTP/0.9 "Simple-Response" (RFC 1945): when set, connection_write()
+    // drops everything up to and including the blank line that ends the
+    // header block - however it is split across writes - and sends only the
+    // body. Set by the router for a genuine HTTP/0.9 request (no version, no
+    // headers), whose client would otherwise show the status line and
+    // headers as the start of the page.
+    int   simple_response;
+    int   header_end_matched;   // bytes of "\r\n\r\n" seen so far; 4 = body
 } connection_ctx_t;
 
 ssize_t connection_write(void *ctx, const char *buf, size_t count);
