@@ -1065,6 +1065,223 @@
   color: var(--br-admin-accent);
 }
 
+/* Site settings: "Boat Rudder 0.0.4 · Check for updates" under the title. */
+.boat-rudder-dashboard__version {
+  margin: -8px 0 16px 0;
+  font-size: var(--br-admin-font-md);
+  color: var(--br-admin-text-muted);
+}
+
+.boat-rudder-dashboard__version strong {
+  color: var(--br-admin-text);
+}
+
+/* Updates (updates_epoch3.html): the installed version, the check's result
+   and "Check now" in one card; then every release's notes, newest first. */
+.boat-rudder-updates__summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px 32px;
+}
+
+.boat-rudder-updates__installed {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.boat-rudder-updates__version {
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.boat-rudder-updates__status {
+  flex: 1 1 280px;
+  min-width: 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--br-admin-border);
+}
+
+.boat-rudder-updates__status p {
+  margin: 4px 0 0 0;
+}
+
+.boat-rudder-updates__status p:not(.boat-rudder-dashboard__hint) {
+  font-size: var(--br-admin-font-md);
+}
+
+.boat-rudder-updates__status--ok        { border-left-color: var(--br-admin-success); }
+.boat-rudder-updates__status--available { border-left-color: var(--br-admin-accent); }
+.boat-rudder-updates__status--error     { border-left-color: var(--br-admin-danger); }
+
+.boat-rudder-updates__command {
+  margin: 6px 0;
+  padding: 8px 10px;
+  overflow-x: auto;
+  font-size: var(--br-admin-font-md);
+  background: var(--br-admin-surface-raised);
+  border: 1px solid var(--br-admin-border);
+  border-radius: var(--br-admin-radius);
+}
+
+/* Updates: "Your password" + Update / Roll back, side by side. */
+.boat-rudder-updates__apply {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.boat-rudder-updates__password {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--br-admin-font-sm);
+  color: var(--br-admin-text-muted);
+}
+
+.boat-rudder-updates__rollback p {
+  margin: 0 0 4px 0;
+  font-size: var(--br-admin-font-md);
+}
+
+/* The last run (updates-progress_epoch3.html): title, stages, message, log.
+   Live while it runs - html/assets/js/updates.js moves the stages. */
+.boat-rudder-updates__progress {
+  border-left: 3px solid var(--br-admin-accent);
+}
+
+.boat-rudder-updates__progress--done        { border-left-color: var(--br-admin-success); }
+.boat-rudder-updates__progress--failed,
+.boat-rudder-updates__progress--rolled-back { border-left-color: var(--br-admin-danger); }
+
+.boat-rudder-updates__progress-title {
+  font-size: 16px;
+}
+
+.boat-rudder-updates__stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.boat-rudder-updates__stage {
+  padding: var(--br-admin-pad-sm);
+  font-size: var(--br-admin-font-sm);
+  color: var(--br-admin-text-muted);
+  border: 1px solid var(--br-admin-border);
+  border-radius: var(--br-admin-radius);
+}
+
+.boat-rudder-updates__stage--done {
+  color: var(--br-admin-text);
+  border-color: var(--br-admin-success);
+}
+
+.boat-rudder-updates__stage--current {
+  color: var(--br-admin-on-accent);
+  background: var(--br-admin-accent);
+  border-color: var(--br-admin-accent);
+}
+
+.boat-rudder-updates__stage--failed {
+  color: var(--br-admin-on-danger);
+  background: var(--br-admin-danger);
+  border-color: var(--br-admin-danger);
+}
+
+.boat-rudder-updates__progress-message {
+  margin: 0 0 4px 0;
+  font-size: var(--br-admin-font-md);
+}
+
+.boat-rudder-updates__log {
+  margin-top: 8px;
+  font-size: var(--br-admin-font-sm);
+}
+
+.boat-rudder-updates__log summary {
+  cursor: pointer;
+  color: var(--br-admin-text-muted);
+}
+
+.boat-rudder-updates__log pre {
+  max-height: 320px;
+  margin: 6px 0 0 0;
+  padding: 8px 10px;
+  overflow: auto;
+  font-size: 12px;
+  white-space: pre-wrap;
+  background: var(--br-admin-surface-raised);
+  border: 1px solid var(--br-admin-border);
+  border-radius: var(--br-admin-radius);
+}
+
+.boat-rudder-updates__check {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.boat-rudder-updates__intro {
+  margin-bottom: 12px;
+}
+
+.boat-rudder-updates__releases {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.boat-rudder-updates__release-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  cursor: pointer;
+}
+
+.boat-rudder-updates__release-head strong {
+  font-size: 16px;
+}
+
+.boat-rudder-updates__release[open] .boat-rudder-updates__release-head {
+  margin-bottom: 8px;
+}
+
+/* Release notes rendered from Markdown (utils/markdown_lite.c): h3..h6. */
+.boat-rudder-updates__notes {
+  font-size: var(--br-admin-font-md);
+  line-height: 1.5;
+}
+
+.boat-rudder-updates__notes :is(h3, h4, h5, h6) {
+  margin: 14px 0 6px 0;
+  font-size: 14px;
+}
+
+.boat-rudder-updates__notes p,
+.boat-rudder-updates__notes ul {
+  margin: 6px 0;
+}
+
+.boat-rudder-updates__notes ul {
+  padding-left: 20px;
+}
+
+.boat-rudder-updates__notes code {
+  font-size: 12px;
+  padding: 0 3px;
+  background: var(--br-admin-surface-raised);
+  border-radius: var(--br-admin-radius);
+}
+
 /* Site settings: the epoch 2 and epoch 3 favicons, side by side - preview
    (pixelated, so a 16x16 icon shows its real pixels), name, status, upload. */
 .boat-rudder-dashboard__favicons {

@@ -493,11 +493,12 @@ on `.boat-rudder/update.lock`).
 | Command | Does |
 |---|---|
 | `status` | Installed version, binary `--version`, service state, whether the signing key is installed, system files modified or missing (`manifest.sh verify`), the last update |
-| `check` | The releases on `github.com/jpablotoledom/boat-rudder` that have both `-src.tar.gz` and `.minisig` and are newer than the installed version |
+| `check` | The releases on GitHub (`update_repo` in `settings.conf`, default `jpablotoledom/boat-rudder`) that have both `-src.tar.gz` and `.minisig` and are newer than the installed version. The dashboard's `/dashboard/settings/updates` shows the same list with each release's notes |
 | `install <version>\|latest [--yes] [--force]` | Downloads that release and runs the stages below. `--force` reinstalls the installed version |
 | `install --file <pkg.tar.gz> --sig <pkg.minisig>` | The same from a package already on the host |
 | `rollback [--restore-db] [--yes]` | Undoes the newest update not already rolled back, from its backup |
-| `history` | Every install and rollback, from `.boat-rudder/history.jsonl` |
+| `history` | Every install and rollback, from `.boat-rudder/history.jsonl` - with who ran it (`by`: the `sudo` user, or `dashboard:<email>`) |
+| `run-request` | What the dashboard starts: carries out `.boat-rudder/request.json` (below) |
 
 Stages of `install` - everything that can fail runs before the site is touched:
 
@@ -526,6 +527,25 @@ Stages of `install` - everything that can fail runs before the site is touched:
 `rollback` restores the backup's files, deletes the ones the update added, restores manifest,
 `VERSION` and key, restarts and checks health. The database is restored only with
 `--restore-db` - by default, entries written since the update are kept.
+
+**From the dashboard** (`/dashboard/settings/updates`, admin, password typed again): the server
+writes `.boat-rudder/request.json` - `{id, action: install|rollback, version, user}` - and
+`.boat-rudder/progress.json` (`queued`), then starts
+
+```
+systemd-run --unit=boat-rudder-update --collect --quiet --setenv=BR_INSTALL_DIR=<install> \
+            <install>/scripts/boat-rudder-update run-request
+```
+
+A transient unit, so it lives outside `boat-rudder.service` - which the update stops and starts -
+and a second request can't start while one runs (the unit name is taken; the lock also holds).
+`run-request` validates every field of the request and deletes it before acting, runs
+`install <version> --yes` or `rollback --yes`, sends its output to `.boat-rudder/last-run.log`, and
+rewrites `progress.json` (`{id, action, version, from, user, state, stage, message, started_at,
+updated_at}`) at every stage: `running` → `done`, `failed` or `rolled-back`. A run that ends any
+other way (`set -e`, a signal) is reported `failed` on exit. The server shows a `queued` run older
+than 2 minutes, or a `running` one silent for 2 hours, as failed. No unit file is installed:
+`systemd-run` is enough. The server forwards its own `BR_*` variables, for test setups.
 
 Environment overrides, for testing: `BR_INSTALL_DIR`, `BR_REPO`, `BR_SERVICE`, `BR_SERVICECTL`,
 `BR_MINISIGN`, `BR_HEALTH_BASE`, `BR_HEALTH_TIMEOUT`, `BR_KEEP_BACKUPS`, `BR_NO_DB_BACKUP`,

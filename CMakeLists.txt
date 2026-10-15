@@ -66,6 +66,7 @@ set(SOURCES
     src/utils/http_utils.c
     src/utils/detect_epoch.c
     src/utils/css_compat.c
+    src/utils/markdown_lite.c
     src/utils/read_file.c
     src/utils/generate_url_theme.c
     src/utils/template_utils.c
@@ -108,6 +109,7 @@ set(SOURCES
     src/modules/media_admin/media_admin.c
     src/modules/site_settings_admin/site_settings_admin.c
     src/modules/browser_detection_admin/browser_detection_admin.c
+    src/modules/updates_admin/updates_admin.c
     src/modules/fonts_admin/fonts_admin.c
     src/modules/analytics/analytics.c
     src/modules/analytics/geoip.c

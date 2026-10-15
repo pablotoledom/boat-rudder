@@ -75,4 +75,8 @@ extern int  wap_gateway_wsp_port;
 // wap_gateway.c's rate_allow().
 extern int  wap_gateway_rate_limit;
 
+// GitHub repository ("owner/name") whose releases /dashboard/settings/updates
+// lists - the same one scripts/boat-rudder-update installs from.
+extern char update_repo[128];
+
 #endif // CONFIG_LOADER_H

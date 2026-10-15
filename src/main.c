@@ -7,6 +7,7 @@
 #include "modules/analytics/geoip.h"
 #include "utils/config_loader.h"
 #include "utils/log.h"
+#include "utils/version.h"
 #include "wap_gateway/wap_gateway.h"
 #include "web_server/server_listener.h"
 #include <errno.h>
@@ -34,10 +35,6 @@ static void sigchld_handler(int s) {
     while (waitpid(-1, NULL, WNOHANG) > 0);
     errno = saved;
 }
-
-#ifndef BOAT_RUDDER_VERSION
-#define BOAT_RUDDER_VERSION "unknown"   // set by CMakeLists.txt from ./VERSION
-#endif
 
 static void print_usage(const char *prog) {
     fprintf(stderr,

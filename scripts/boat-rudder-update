@@ -12,9 +12,18 @@
 #   boat-rudder-update install --file <pkg.tar.gz> --sig <pkg.tar.gz.minisig> [--yes] [--force]
 #   boat-rudder-update rollback [--restore-db] [--yes]
 #   boat-rudder-update history
+#   boat-rudder-update run-request
 #
 # --yes skips the confirmation prompt (required when stdin is not a terminal);
 # --force reinstalls the installed version, or installs an older one.
+#
+# run-request is what the dashboard starts (/dashboard/settings/updates): the
+# server writes .boat-rudder/request.json - {id, action: install|rollback,
+# version, user} - and runs this script as a transient systemd unit
+# (systemd-run), outside its own service, which an update stops and starts.
+# The request is carried out with --yes; its output goes to
+# .boat-rudder/last-run.log and its progress - stage, state, message - to
+# .boat-rudder/progress.json, which the page polls.
 #
 # Everything that can fail - download, signature, extraction, build - happens
 # in .boat-rudder/staging/ while the site keeps running. Only then is the
@@ -22,7 +31,8 @@
 #
 # Environment overrides, for tests and unusual hosts:
 #   BR_INSTALL_DIR   install directory            (/usr/local/bin/boat-rudder)
-#   BR_REPO          GitHub owner/name             (jpablotoledom/boat-rudder)
+#   BR_REPO          GitHub owner/name             (update_repo in settings.conf,
+#                                                  else jpablotoledom/boat-rudder)
 #   BR_SERVICE       systemd unit                  (boat-rudder)
 #   BR_SERVICECTL    service control command       (systemctl)
 #   BR_MINISIGN      minisign binary               (minisign)
@@ -38,7 +48,7 @@ set -euo pipefail
 # consumers read their whole input, wherever that could happen.
 
 INSTALL_DIR="${BR_INSTALL_DIR:-/usr/local/bin/boat-rudder}"
-REPO="${BR_REPO:-jpablotoledom/boat-rudder}"
+REPO="${BR_REPO:-}"                            # else update_repo in settings.conf, below
 SERVICE="${BR_SERVICE:-boat-rudder}"
 SERVICECTL="${BR_SERVICECTL:-systemctl}"
 MINISIGN="${BR_MINISIGN:-minisign}"
@@ -53,9 +63,28 @@ UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrom
 # ---- Output and state --------------------------------------------------------
 
 log()  { printf '%s\n' "$*"; }
-step() { printf '\n==> %s\n' "$*"; }
+step() { printf '\n==> %s\n' "$*"; STAGE="${1%% - *}"; progress running "$STAGE" ""; }
 warn() { printf 'Warning: %s\n' "$*" >&2; }
-die()  { printf 'boat-rudder-update: %s\n' "$*" >&2; exit 1; }
+die()  {
+    printf 'boat-rudder-update: %s\n' "$*" >&2
+    progress "$FAIL_STATE" "$STAGE" "$*"
+    exit 1
+}
+
+# progress <state> <stage> <message> - for the dashboard, only in run-request
+# mode: .boat-rudder/progress.json, replaced whole (rename) so a reader never
+# sees half of it. States: queued (written by the server), running, done,
+# failed, rolled-back.
+progress() {
+    [ "$PROGRESS" = "1" ] || return 0
+    case "$1" in done|failed|rolled-back) PROGRESS_FINAL=1 ;; esac
+    printf '{"id":"%s","action":"%s","version":"%s","from":"%s","user":"%s","state":"%s","stage":"%s","message":"%s","started_at":"%s","updated_at":"%s"}\n' \
+        "$REQ_ID" "$REQ_ACTION" "$(json_str "$REQ_VERSION")" "$(json_str "$REQ_FROM")" "$(json_str "$REQ_USER")" \
+        "$1" "$(json_str "$2")" "$(json_str "$3")" "$REQ_STARTED" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        > "$STATE/progress.json.tmp" 2>/dev/null &&
+        mv -f "$STATE/progress.json.tmp" "$STATE/progress.json" 2>/dev/null
+    return 0
+}
 
 usage() {
     sed -n '/^#   boat-rudder-update status/,/^# --force/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2
@@ -69,14 +98,17 @@ cfg() {   # value of a configs/settings.conf key, or $2
     printf '%s' "${v:-${2:-}}"
 }
 
+[ -n "$REPO" ] || REPO="$(cfg update_repo jpablotoledom/boat-rudder)"
+
 installed_version() { head -n1 "$STATE/VERSION" 2>/dev/null || echo "unknown"; }
 
 json_str() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\n\t' '  '; }
 
 record() {   # record <action> <from> <to> <source> <result> <backup> <detail>
-    printf '{"time":"%s","action":"%s","from":"%s","to":"%s","source":"%s","result":"%s","backup":"%s","detail":"%s"}\n' \
+    printf '{"time":"%s","action":"%s","from":"%s","to":"%s","source":"%s","result":"%s","backup":"%s","detail":"%s","by":"%s"}\n' \
         "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(json_str "$1")" "$(json_str "$2")" "$(json_str "$3")" \
-        "$(json_str "$4")" "$(json_str "$5")" "$(json_str "$6")" "$(json_str "$7")" >> "$STATE/history.jsonl"
+        "$(json_str "$4")" "$(json_str "$5")" "$(json_str "$6")" "$(json_str "$7")" "$(json_str "$BY")" \
+        >> "$STATE/history.jsonl"
 }
 
 require_root() {
@@ -425,8 +457,7 @@ cmd_install() {
     from="$(installed_version)"
     dir="$STATE/staging/$(date -u +%Y%m%d-%H%M%S)"
     mkdir -p "$dir"
-    STAGING="$dir"   # global: the EXIT trap runs after this function returns
-    trap 'rm -rf "$STAGING/extract"' EXIT
+    STAGING="$dir"   # global: on_exit() runs after this function returns
 
     step "Package"
     if [ -n "$file" ]; then
@@ -472,6 +503,7 @@ cmd_install() {
         prune_backups
         log ""
         log "Updated to $to."
+        progress done "Apply" "Updated to $to."
         return 0
     fi
 
@@ -482,7 +514,8 @@ cmd_install() {
     service start || true
     if health_check; then
         record install "$from" "$to" "$SOURCE" rolled-back "$name" "${HEALTH_DETAIL:-apply failed}"
-        die "update to $to failed and was rolled back to $from (staging kept: $dir)"
+        FAIL_STATE="rolled-back"
+        die "update to $to failed (${HEALTH_DETAIL:-apply failed}) and was rolled back to $from (staging kept: $dir)"
     fi
     record install "$from" "$to" "$SOURCE" rollback-unhealthy "$name" "${HEALTH_DETAIL:-}"
     die "update to $to failed, and $from isn't healthy after the rollback either - check 'journalctl -u $SERVICE' and /var/log/boat-rudder.log"
@@ -511,6 +544,7 @@ cmd_rollback() {
     log "Roll back $from -> $to (backup $name)$([ "$restore_db" = 1 ] && echo ', restoring the database')."
     confirm "Roll back?"
 
+    step "Rollback"
     service stop || true
     restore_backup "$bk"
     [ "$restore_db" = "1" ] && db_restore "$bk"
@@ -519,10 +553,46 @@ cmd_rollback() {
     if health_check; then
         record rollback "$from" "$to" "backup:$name" ok "$name" "$([ "$restore_db" = 1 ] && echo 'database restored')"
         log "Rolled back to $to."
+        progress done "Rollback" "Rolled back to $to."
     else
         record rollback "$from" "$to" "backup:$name" unhealthy "$name" "${HEALTH_DETAIL:-}"
         die "rolled back to $to, but the site isn't healthy - check /var/log/boat-rudder.log"
     fi
+}
+
+# The dashboard's request (see the header): validated field by field - the
+# server wrote it, but nothing in it is trusted - and removed before it runs,
+# so a crash can't make it run twice.
+cmd_run_request() {
+    require_root
+    [ -d "$STATE" ] || die "no update state at $STATE"
+    local req="$STATE/request.json" json
+    [ -f "$req" ] || die "no request ($req)"
+    json="$(cat "$req")"; rm -f "$req"
+    req_field() { sed -n 's/.*"'"$1"'" *: *"\([^"\\]*\)".*/\1/p' <<< "$json"; }
+
+    REQ_ID="$(req_field id)"; REQ_ACTION="$(req_field action)"
+    REQ_VERSION="$(req_field version)"; REQ_USER="$(req_field user)"
+    [[ "$REQ_ID" =~ ^[0-9]{1,20}$ ]] || REQ_ID="0"
+    [[ "$REQ_USER" =~ ^[A-Za-z0-9._%+@-]{1,120}$ ]] || REQ_USER="unknown"
+    REQ_FROM="$(installed_version)"
+    REQ_STARTED="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    BY="dashboard:$REQ_USER"
+
+    exec > "$STATE/last-run.log" 2>&1
+    PROGRESS=1
+    progress running "" ""
+    log "Requested from the dashboard by $REQ_USER: $REQ_ACTION $REQ_VERSION ($(date -u))"
+    case "$REQ_ACTION" in
+        install)
+            [[ "$REQ_VERSION" =~ ^[0-9]+(\.[0-9]+){0,3}$ ]] || die "invalid version in the request"
+            cmd_install "$REQ_VERSION" --yes ;;
+        rollback)
+            REQ_VERSION=""
+            cmd_rollback --yes ;;
+        *)
+            REQ_ACTION="unknown"; die "invalid action in the request" ;;
+    esac
 }
 
 cmd_history() {
@@ -530,14 +600,33 @@ cmd_history() {
     cat "$STATE/history.jsonl"
 }
 
+# Whatever ends the run: the staging's extracted sources go, and a dashboard
+# run that stopped without saying how (set -e, a signal) is reported failed
+# instead of "running" forever.
+on_exit() {
+    local rc=$?
+    [ -z "$STAGING" ] || rm -rf "$STAGING/extract"
+    if [ "$PROGRESS" = "1" ] && [ "$PROGRESS_FINAL" = "0" ]; then
+        progress failed "$STAGE" "stopped unexpectedly (exit $rc) - see the log"
+    fi
+}
+
 YES=0
 STAGING=""
 FORCE=0
+PROGRESS=0
+PROGRESS_FINAL=0
+FAIL_STATE="failed"
+STAGE=""
+REQ_ID="" REQ_ACTION="" REQ_VERSION="" REQ_FROM="" REQ_USER="" REQ_STARTED=""
+BY="${SUDO_USER:-$(id -un 2>/dev/null || echo '?')}"
+trap on_exit EXIT
 case "${1:-}" in
     status)   shift; cmd_status ;;
     check)    shift; cmd_check ;;
     install)  shift; cmd_install "$@" ;;
     rollback) shift; cmd_rollback "$@" ;;
     history)  shift; cmd_history ;;
+    run-request) shift; cmd_run_request ;;
     *)        usage ;;
 esac

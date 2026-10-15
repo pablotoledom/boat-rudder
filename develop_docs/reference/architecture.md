@@ -108,6 +108,8 @@ boat-rudder/
 │   │   ├── site_settings_admin/         # /dashboard/settings: name, themes, banner/footer/logo,
 │   │   │                                # CSS, preview (see themes.md)
 │   │   ├── fonts_admin/                 # /dashboard/settings/fonts (see fonts.md)
+│   │   ├── updates_admin/               # /dashboard/settings/updates: version, releases, notes,
+│   │   │                                # install / roll back through boat-rudder-update
 │   │   ├── analytics/                   # analytics.c (visit tracking), geoip.c (optional GeoLite2)
 │   │   ├── analytics_view/              # /dashboard/analytics report + country_continent.c
 │   │   ├── login/login.c/h              # /login form (epoch3 only) per epoch
@@ -140,6 +142,8 @@ boat-rudder/
 │       │                                # path sanitizer, trusted proxy check
 │       ├── detect_epoch.c/h             # User-Agent → epoch: rule engine, factory rules, active set
 │       ├── css_compat.c/h               # CSS features vs. the detection rules' floors
+│       ├── markdown_lite.c/h            # CHANGELOG-style Markdown subset → escaped HTML (release notes)
+│       ├── version.h                    # BOAT_RUDDER_VERSION fallback (CMake sets it from VERSION)
 │       ├── request_lang.c/h             # Per-request content language + request path
 │       ├── request_theme.c/h            # Per-request theme (?theme= → cookie → DB → config)
 │       ├── request_user.c/h             # Per-request signed-in user's display name
@@ -195,7 +199,8 @@ An **install** (`/usr/local/bin/boat-rudder/`) has the same `boat-rudder`, `scri
 `configs/`, `ssl/` and `data/`, plus `.boat-rudder/`: its `VERSION` and `manifest.sha256`, the
 SHA-256 of every system file installed - the files an update may replace, and the only ones
 ([scripts.md](scripts.md#scriptsmanifestsh)) - the release key `minisign.pub`, and the updater's
-`backups/`, `staging/` and `history.jsonl` ([scripts.md](scripts.md#scriptsboat-rudder-update)).
+`backups/`, `staging/`, `history.jsonl`, and the dashboard's `request.json`, `progress.json` and
+`last-run.log` ([scripts.md](scripts.md#scriptsboat-rudder-update)).
 
 Also tracked but not part of the build or runtime: `design/` (`.xcf` image sources for theme
 artwork), `data/mongo_example.c` and `data/querys.json` (scratch examples), and `db_backup/`,

@@ -156,6 +156,11 @@ All **E3, A**. Detailed behavior in [themes.md](themes.md) and [fonts.md](fonts.
 | `POST` | `/dashboard/api/browsers/preview` | `browser_detection_admin_preview()` | JSON `{fallback_epoch, rules, cases, try_user_agent}` → each case under the posted and the active rules, the try box's result, `keeps_dashboard`. `400` `{error, position}` if invalid. Saves nothing |
 | `POST` | `/dashboard/api/browsers` | `browser_detection_admin_save()` | Same JSON → stored, in effect at once. `400` if invalid; `409` if the saving browser would lose the dashboard |
 | `POST` | `/dashboard/settings/browsers/reset` | `cms_browser_detection_reset()` | Factory rules again; `302` back |
+| `GET` | `/dashboard/settings/updates` | `updates_admin_page()` | Installed version, the releases of `update_repo` on GitHub with their notes; fetches the list (curl, 10 s timeout) when it is over an hour old |
+| `POST` | `/dashboard/settings/updates/check` | `updates_admin_check_now()` | *Check now*: fetches the release list again; `302` back |
+| `POST` | `/dashboard/settings/updates/install` | `confirm_password()`, `updates_admin_request("install")` | Fields `password` (the admin's, again) and `version` (a signed release newer than the running one, from the last check). Queues the request and starts the updater (`systemd-run`); `302` back, or with `?error=password\|busy\|version\|unavailable\|launch` |
+| `POST` | `/dashboard/settings/updates/rollback` | `confirm_password()`, `updates_admin_request("rollback")` | Field `password`. Undoes the update that installed the running version; `302` back, or `?error=…` (`rollback` when there is none) |
+| `GET` | `/dashboard/api/updates/progress` | `updates_admin_progress_json()` | `{id, state, stage, message, log}` of the last run - `state`: `none`, `queued`, `running`, `done`, `failed`, `rolled-back`; `log` the tail of `.boat-rudder/last-run.log`. Polled by `html/assets/js/updates.js` |
 | `GET` | `/dashboard/settings/fonts` | `fonts_admin_list()` | Query `error` shows a message |
 | `POST` | `/dashboard/settings/fonts/upload` | `cms_add_font()` | Multipart `name`, `file` (`.ttf/.otf/.woff/.woff2`) |
 | `POST` | `/dashboard/settings/fonts/<id>/delete` | `cms_delete_font()` + file removal | |

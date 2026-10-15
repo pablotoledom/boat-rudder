@@ -2,7 +2,10 @@
 
 > **Status**: approved (2026-10-14). Phases 1-3 implemented (2026-10-14): `VERSION`, `--version`,
 > `scripts/manifest.sh`, `install.sh` writing `.boat-rudder/`; `scripts/release.sh`;
-> `scripts/boat-rudder-update`. Phase 4 (dashboard) not implemented. Where the implementation
+> `scripts/boat-rudder-update`. Phase 4 implemented (2026-10-15) without *Upload package*:
+> `/dashboard/settings/updates` shows the version, checks GitHub, shows the notes, installs and
+> rolls back. The updater runs as a transient unit (`systemd-run`) instead of an installed
+> `boat-rudder-update.service`. Where the implementation
 > differs from this plan, [scripts.md](../reference/scripts.md) describes what it does. References: [scripts.md](../reference/scripts.md),
 > [security.md](../reference/security.md), [dashboard.md](../reference/dashboard.md).
 
@@ -190,7 +193,7 @@ reconnects on its own across the restart.
 | 1. Baseline - **done** | `VERSION` and `boat-rudder --version`; `scripts/manifest.sh` (`create`, `adopt`, `verify`); `install.sh` writes `.boat-rudder/` (`VERSION`, `manifest.sha256`, and `minisign.pub` once phase 2 adds it); `manifest.sh adopt` builds the manifest of an existing install from the source of its version and reports host edits ([scripts.md](../reference/scripts.md#scriptsmanifestsh)) | Every install knows exactly what it is |
 | 2. Releases - **done** | Signing key pair; `scripts/release.sh` ([scripts.md](../reference/scripts.md#scriptsreleasesh)) | Signed source packages on GitHub |
 | 3. Command-line updater - **done** | `boat-rudder-update`: check, install, rollback, status, history - §4-§6 ([scripts.md](../reference/scripts.md#scriptsboat-rudder-update)) | Safe updates and rollbacks over SSH |
-| 4. Dashboard | `/dashboard/settings/updates`, `boat-rudder-update.service` | The same from the browser |
+| 4. Dashboard - **done** (but *Upload package*) | `/dashboard/settings/updates`: version, check, notes, *Update*, *Roll back* through `systemd-run … boat-rudder-update run-request` ([dashboard.md](../reference/dashboard.md), [scripts.md](../reference/scripts.md#scriptsboat-rudder-update)); *Upload package* - later | The same from the browser |
 
 Phases 1-3 remove the risk; phase 4 is convenience.
 

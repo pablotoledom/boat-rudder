@@ -1,0 +1,12 @@
+<form method="POST" action="/dashboard/settings/updates/install" class="boat-rudder-updates__apply">
+          <input type="hidden" name="version" value="%1$s">
+          <label class="boat-rudder-updates__password">Your password
+            <input class="boat-rudder-input boat-rudder-input--sm" type="password" name="password"
+                   autocomplete="current-password" required>
+          </label>
+          <button class="boat-rudder-btn boat-rudder-btn--primary" type="submit">Update to %1$s</button>
+        </form>
+        <p class="boat-rudder-dashboard__hint">The package's signature is checked, it is compiled and
+           the files it replaces are backed up before the site is touched. The site then stops for
+           a few seconds while the files are swapped, and the update undoes itself if the site
+           doesn't come back.</p>

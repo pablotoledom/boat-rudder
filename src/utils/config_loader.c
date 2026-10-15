@@ -33,6 +33,7 @@ char wap_gateway_ips[256]   = {0};
 int  wap_gateway_rover_port = 49300;
 int  wap_gateway_wsp_port   = 9200;
 int  wap_gateway_rate_limit = 60;
+char update_repo[128]      = "jpablotoledom/boat-rudder";
 
 int load_config(const char *filename) {
     FILE *file = fopen(filename, "r");
@@ -114,6 +115,9 @@ int load_config(const char *filename) {
             wap_gateway_wsp_port = atoi(value);
         } else if (strcmp(key, "wap_gateway_rate_limit") == 0) {
             wap_gateway_rate_limit = atoi(value);
+        } else if (strcmp(key, "update_repo") == 0) {
+            strncpy(update_repo, value, sizeof(update_repo) - 1);
+            update_repo[sizeof(update_repo) - 1] = '\0';
         }
     }
 

@@ -1,13 +1,39 @@
 # Changelog
 
-All notable changes to Boat Rudder. Dates are commit dates; commit hashes are given for
-reference. The project has no tagged releases yet - everything below is the work leading up to
-**v0.0.1** (the current branch).
+All notable changes to Boat Rudder, newest first. Each `## vX.Y.Z` section is one release:
+`scripts/release.sh` publishes it as that release's notes on GitHub, and the dashboard's
+Updates page shows them. Changes not released yet go under `## Unreleased` until the next
+release renames it. Dates are commit dates; older entries give commit hashes for reference.
 
 Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *Added*,
 *Changed*, *Fixed*, *Removed*, *Security*, *Docs*.
 
 ---
+
+## v0.0.5
+### 2026-10-15
+
+### Update system, phase 4: updates from the dashboard
+
+**Added**
+- `/dashboard/settings/updates` (admin): the installed version, whether a newer signed release
+  exists, and every release's notes, newest first, marked *Installed*, *New*, *Pre-release* or
+  *No signed package*. The list comes from the GitHub API (through `curl`), is kept for an hour,
+  and *Check now* fetches it again.
+- *Update to X* and *Roll back to X* on that page, each asking for the admin's password again.
+  The server starts `boat-rudder-update run-request` as a transient systemd unit (`systemd-run`)
+  and the page follows it live - stages, message, log - across the restart, then shows the
+  result. Same safeguards as the console: signature, build before touching the site, backup,
+  health check, automatic rollback.
+- `boat-rudder-update run-request`, `.boat-rudder/progress.json` and `last-run.log`; `history`
+  records who ran each update (`by`).
+- Site settings shows the running version under its title, with a link to *Updates*, and an
+  *Updates* card under *More settings*.
+- `update_repo` in `settings.conf`: the GitHub repository of the releases, for the page and for
+  `boat-rudder-update` (default `jpablotoledom/boat-rudder`).
+- `src/utils/markdown_lite.c`: the Markdown subset of `CHANGELOG.md` to escaped HTML, for the
+  release notes.
+
 
 ## v0.0.4
 ### 2026-10-14
