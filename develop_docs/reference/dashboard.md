@@ -434,7 +434,7 @@ A media library for uploading and managing images used in entries. Requires a da
 - `media_directories` - folder structure: `{ _id, name, parent, author_id }`. Each directory maps to a physical folder at `html/content/posts/<username>/<dirname>/`.
 - `media_galleries` - gallery data for public rendering: `{ _id, content: [url, ...], entry_id }`. Created/updated automatically when saving an entry's `gallery` content block.
 
-**Image variants**: `scripts/image-optimizer.sh` processes each upload via ImageMagick and generates 5 variants (`_full`, `_half`, `_small`, `_medium`, `_micro`) before deleting the original. The base URL (without suffix) is a symlink to `_half`. Requires `imagemagick`, `jpegoptim`, `gifsicle`.
+**Image variants**: `scripts/image-optimizer.sh` processes each upload via ImageMagick and generates 5 variants (`_full`, `_half`, `_small`, `_medium`, `_micro`) before deleting the original; only the variants are kept, so the stored base URL (without suffix) is never a file - pages always request a variant. Requires `imagemagick`, `jpegoptim`, `gifsicle`.
 
 **Routes**:
 

@@ -195,7 +195,7 @@ Errors are plain text. Detailed in [media-admin.md](media-admin.md).
 | `POST` | `/dashboard/api/media/directory/delete` | `cms_delete_media_directory()` + `rmdir()` | Field `id`. **OwnMedia**; `409` while it has images (or stray files on disk) |
 | `POST` | `/dashboard/api/media/delete` | `cms_delete_media()` + unlink of every size variant | Field `ids` (comma-separated). **OwnMedia** per item; `403` if none was allowed |
 | `POST` | `/dashboard/api/media/move` | `cms_move_media()` + `rename()` of every variant | Fields `ids` (comma-separated), `dest_dir`; **OwnMedia** on the destination and per item, and only between directories of the item's own author; plain-text result |
-| `POST` | `/dashboard/api/media/upload` | file write + `scripts/image-optimizer.sh` + `cms_insert_media()` | `{ok, filename, dir_id}`; multipart `file` (JPEG/PNG/GIF/WebP by extension **and** magic bytes, else `415`), `media-directory-selected` (empty → author's `default` directory; another author's → `403`) |
+| `POST` | `/dashboard/api/media/upload` | file write + `scripts/image-optimizer.sh` + `cms_insert_media()` | `{ok, filename, dir_id}`; multipart `file` (JPEG/PNG/GIF/WebP by magic bytes, else `415`; stored under that format's extension whatever the name said), `media-directory-selected` (empty → author's `default` directory; another author's → `403`) |
 
 ### Theme assets
 

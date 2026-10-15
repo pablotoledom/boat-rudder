@@ -411,8 +411,7 @@ These scripts are not meant to be called directly but can be if needed. All of t
 ### `scripts/image-optimizer.sh`
 
 Invoked by the server itself (not by `boat_rudder_builder.sh`) after every media upload. Generates 5 variants
-per image - `_full`, `_half`, `_small`, `_medium`, `_micro` - deletes the original and symlinks
-the base filename to `_half`. Requires `imagemagick`, `jpegoptim` and `gifsicle`; without them
+per image - `_full`, `_half`, `_small`, `_medium`, `_micro` - deletes the original; only the five variants are left. Requires `imagemagick`, `jpegoptim` and `gifsicle`; without them
 uploads still succeed but no variants are produced, so thumbnails and the retro epochs break.
 Full details in [media-admin.md](media-admin.md).
 

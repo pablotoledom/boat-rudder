@@ -11,6 +11,40 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *A
 
 ## v0.0.1
 
+### 2026-10-14
+### Gallery block editing
+
+**Changed**
+- Uploaded file names: spaces and dots before the extension become `_`, and anything outside
+  `[A-Za-z0-9_-]` is dropped (`Mi foto (1).jpg` → `Mi_foto_1.jpg`). A name already used in the
+  directory gets `_2`, `_3`... (`photo.png` and `photo.jpg` count as the same name, since they'd
+  share their variants).
+- The gallery block shows its photos as numbered tiles: each can be moved with ← / → or dragged,
+  and removed with ×. *Add photos* (header button and the last tile) appends the picked photos
+  after the existing ones, skipping duplicates, instead of replacing the whole gallery.
+
+**Fixed**
+- Reordering a gallery's thumbnails was erratic after picking photos again: every re-render
+  added another set of drag listeners, so one drag moved a thumbnail several times.
+- Media library: deleting (or moving) photos while no directory was selected - how the picker
+  opens, on the latest uploads - left them in the grid until it was reopened; the grid now
+  reloads whatever it is showing.
+- Media uploads: a file whose extension didn't match its content (a WebP saved as `.jpg`) was
+  refused with `415`. The content now decides: any JPEG/PNG/GIF/WebP is accepted and stored under
+  its real extension; anything else is still refused.
+- An author's first upload with no directory selected failed with `500` when they had no folder
+  under `html/content/posts/` yet: the default directory was created before its parent.
+- The optimizer no longer leaves a base-name symlink to `_half` (`photo.jpg → photo_half.jpg`)
+  next to the variants: it looked like an undeleted original, and nothing requests the bare
+  name - every page asks for a variant. After an upload only `_full`, `_half`, `_small`,
+  `_medium` and `_micro` remain. Deleting or moving an older upload still removes its link.
+- Media uploads are now written with `O_CREAT | O_EXCL | O_NOFOLLOW`: an upload can never write
+  through an existing base-name symlink (into another upload's `_half` variant) or over any
+  existing file, even if the unique-name step were bypassed.
+- Uploading a file whose name already existed in the directory overwrote the earlier upload's
+  `_half` variant (written through its base-name symlink) and added a second media record for
+  the same files, so deleting either removed both pictures.
+
 ### 2026-10-11
 ### Browser detection from the dashboard
 

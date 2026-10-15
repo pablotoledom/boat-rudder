@@ -100,17 +100,9 @@ process_image() {
 
     rm -f "$INPUT_FILE"
 
-    # Create a base-name symlink pointing to _half for direct URL access
-    local BASE_LINK="$OUTPUT_DIR/${FILENAME}"
-    local HALF_BASENAME
-    if [ -f "$HALF_FILE.jpg" ]; then
-        HALF_BASENAME=$(basename "$HALF_FILE.jpg")
-    elif [ -f "$HALF_FILE.gif" ]; then
-        HALF_BASENAME=$(basename "$HALF_FILE.gif")
-    fi
-    if [ -n "$HALF_BASENAME" ]; then
-        ln -sf "$HALF_BASENAME" "$BASE_LINK"
-    fi
+    # Only the five variants remain: _full is the largest size kept, and the
+    # site always asks for a variant (never the bare name), so nothing else -
+    # neither the upload nor a base-name link to it - is left behind.
 
     echo "$FINAL_FILE"
 }

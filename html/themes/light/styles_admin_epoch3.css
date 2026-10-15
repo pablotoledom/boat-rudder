@@ -2122,6 +2122,43 @@ h6.boat-rudder-entry-editor-preview__title { font-size: 13px; font-weight: 600; 
 .boat-rudder-entry-editor__gallery-preview {
   background-color: var(--br-color-body-background, #8dd3ff);
 }
+
+/* Gallery block body: the photos as sortable tiles, in gallery order (see
+   renderGalleryThumbs()). Drag a tile or use its arrows; x removes it; the
+   last tile adds more. */
+.boat-rudder-entry-editor-gallery {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--br-admin-border); border-radius: var(--br-admin-radius);
+}
+.boat-rudder-entry-editor-gallery__item {
+  position: relative; overflow: hidden; cursor: grab;
+  background: var(--br-admin-surface-raised);
+  border: 1px solid var(--br-admin-border); border-radius: var(--br-admin-radius);
+  transition: border-color 0.15s, opacity 0.15s;
+}
+.boat-rudder-entry-editor-gallery__item:hover { border-color: var(--br-admin-accent); }
+.boat-rudder-entry-editor-gallery__item--dragging { opacity: 0.4; }
+.boat-rudder-entry-editor-gallery__thumb {
+  display: block; width: 100%; height: 84px; object-fit: cover;
+  pointer-events: none; /* the tile, not the image, is what gets dragged */
+}
+.boat-rudder-entry-editor-gallery__index {
+  position: absolute; top: 4px; left: 4px; min-width: 12px; padding: 1px 5px;
+  font-size: var(--br-admin-font-xs); font-weight: 700; text-align: center;
+  color: var(--br-admin-on-accent); background: var(--br-admin-accent);
+  border-radius: var(--br-admin-radius);
+}
+.boat-rudder-entry-editor-gallery__actions {
+  display: flex; justify-content: space-between; padding: 2px;
+}
+.boat-rudder-entry-editor-gallery__remove:hover:not(:disabled) { color: var(--br-admin-danger); }
+.boat-rudder-entry-editor-gallery__add,
+.boat-rudder-entry-editor-gallery__add:hover {
+  min-height: 112px; white-space: normal;
+  border: 1px dashed var(--br-admin-border);
+}
+.boat-rudder-entry-editor-gallery__add:hover { border-color: var(--br-admin-accent); }
 .boat-rudder-entry-editor__image-thumb {
   max-width: 100%; max-height: 260px;
   object-fit: contain; border-radius: 2px;

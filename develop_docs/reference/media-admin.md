@@ -117,8 +117,11 @@ For each uploaded image, generates 5 variants and deletes the original:
 | `_medium` | 600 px | always GIF - epoch 1/2 compatibility |
 | `_micro` | 180 px | always GIF - epoch 1 / Mosaic compatibility |
 
-Additionally creates a symlink `<original_name> → <basename>_half.<ext>` so the stored URL
-(without suffix) resolves via the static file server.
+Only the five variants remain on disk: the upload itself is deleted (`_full` is the largest size
+kept) and no file exists under the bare stored name. Every page asks for a variant - entry pages,
+galleries and the blog list through `image_url_variant()`, the media library's thumbnails
+(`_small`) and viewer (`_full`) - so the bare URL is never requested. Uploads made before this
+have a base-name symlink to `_half`; deleting/moving them still removes it.
 
 **Color detection**: images with ≤256 unique colors generate all variants as GIF (with
 Riemersma dithering + gifsicle optimization). Photos generate `_full/_half/_small` as JPEG
@@ -162,7 +165,9 @@ All functions are declared on `window` so they remain available after `activateS
 - `deleteDirectoryBtnHandler()` / `deleteDirectory(id)` - confirm + POST `id` (only empty directories are deleted).
 - Errors from these and the bulk actions are shown with `alert()` using the server's plain-text
   reason (`responseTextOrThrow()`); after a move/delete the grid is reloaded
-  (`refreshSelectedDirectory()`), since only the user's own images may have been affected.
+  (`refreshSelectedDirectory()` → `reloadMediaGrid()`), since only the user's own images may have
+  been affected - the selected directory, or the latest uploads across all directories when none
+  is selected (how the picker opens).
 - Every POST carries the CSRF token through `/assets/js/csrf.js` (loaded by the page layout), not
   through code in this template.
 - `validarCaracter(e)` - keypress validator for directory name input (`[a-zA-Z0-9_-]` only).
@@ -215,9 +220,9 @@ the filesystem. See [security.md](security.md#media-ownership).
 | `POST /dashboard/api/media/directory` | POST | `newpath` (3-60 `[A-Za-z0-9_-]`) → dir on disk + DB, owned by the caller. `409` if the caller already has one with that name. Returns rendered `<li>` HTML. |
 | `POST /dashboard/api/media/directory/rename` | POST | `id`, `newname` → `rename()` + DB update (an absent folder on disk is fine). `403` not the owner, `400` invalid name, `409` name taken. Returns rendered `<li>` HTML. |
 | `POST /dashboard/api/media/directory/delete` | POST | `id` → `rmdir()`, then DB delete. `403` not the owner, `409` while `media` records point at it or files remain on disk. `200 OK` on success. |
-| `POST /dashboard/api/media/delete` | POST | `ids` → unlink every variant (plus the optimizer's original-name symlink) + delete records, for the items the caller may manage. `403` if none, `500` if every allowed id failed, else `200` |
+| `POST /dashboard/api/media/delete` | POST | `ids` → unlink every variant (plus the base-name symlink older uploads have) + delete records, for the items the caller may manage. `403` if none, `500` if every allowed id failed, else `200` |
 | `POST /dashboard/api/media/move` | POST | `ids`, `dest_dir` → rename every variant + `$set dir_id`. `400` unknown destination, `403` destination or items not the caller's, or items of a different author than the destination |
-| `POST /dashboard/api/media/upload` | POST | Multipart `file` + `media-directory-selected`; no/unknown directory → `default`, another author's → `403`. `.jpg/.jpeg/.png/.gif/.webp` with matching magic bytes, else `415`. Optimizer, DB insert; if the optimizer reports no output the upload is deleted (`415`). Returns `{"ok":true,"filename":"...","dir_id":"..."}`. |
+| `POST /dashboard/api/media/upload` | POST | Multipart `file` + `media-directory-selected`; no/unknown directory → `default`, another author's → `403`. JPEG/PNG/GIF/WebP by magic bytes, else `415`; the file is stored under its real format's extension (`photo.jpg` holding a WebP → `photo.webp`). The name is sanitized (`media_sanitize_upload_name()`: spaces and dots before the extension → `_`, anything outside `[A-Za-z0-9_-]` dropped, empty → `image`) and made unique in its directory (`media_unique_name()`: `photo_2`, `photo_3`...; `photo.png` and `photo.jpg` count as the same name, since they'd share their variants). Optimizer, DB insert; if the optimizer reports no output the upload is deleted (`415`). Returns `{"ok":true,"filename":"...","dir_id":"..."}`. |
 | `GET /gallery/<id>` | GET | **Public** (no session). Epoch 3: thumbnail grid page. Epochs 1-2: paginated viewer with prev/next + thumbnails. Epochs -1/0: QR code to the gallery. |
 
 ---

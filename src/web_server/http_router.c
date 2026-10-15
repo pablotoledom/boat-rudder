@@ -73,6 +73,7 @@
 #include <strings.h>
 #include <poll.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -125,11 +126,12 @@ static void media_variant_path(char *out, size_t out_size, const char *dir_path,
              force_gif ? ".gif" : (ext ? ext : ""));
 }
 
-// scripts/image-optimizer.sh also leaves a symlink under the upload's
-// original name (e.g. photo.png -> photo_half.gif), whose extension the DB
-// record no longer carries (it stores photo.gif). The upload allowlist
-// bounds which extensions that can be; each is tried and only ever acted on
-// when it is a symlink, so another item's real file is never touched.
+// Uploads made before scripts/image-optimizer.sh stopped creating it have a
+// base-name symlink to _half, under the stored name (photo.jpg) or the
+// uploaded extension (photo.png), which the DB record doesn't carry; the
+// upload allowlist bounds which extensions that can be, so each is tried,
+// and only ever acted on when it is a symlink - another item's real file is
+// never touched.
 static const char *media_upload_link_exts[] = {
     ".jpg", ".jpeg", ".png", ".gif", ".webp",
     ".JPG", ".JPEG", ".PNG", ".GIF", ".WEBP", NULL
@@ -227,9 +229,13 @@ static int resolve_or_create_default_media_directory(const char *user_id, const 
                                                       CmsMediaDirectory *out) {
     if (cms_get_media_directory_by_name("default", user_id, out)) return 0;
 
-    char dirpath[512];
-    snprintf(dirpath, sizeof(dirpath), "./html/content/posts/%s/default", username);
+    // A new author has no folder under posts/ yet: create it first, as the
+    // directory-create route does, or the default one can't be made.
+    char author_path[512], dirpath[sizeof(author_path) + 16];
+    snprintf(author_path, sizeof(author_path), "./html/content/posts/%s", username);
+    snprintf(dirpath, sizeof(dirpath), "%s/default", author_path);
     struct stat st;
+    if (stat(author_path, &st) == -1) mkdir(author_path, 0775);
     if (stat(dirpath, &st) == -1 && mkdir(dirpath, 0775) != 0) {
         LOG_ERROR("resolve_or_create_default_media_directory: could not create %s: %s",
                   dirpath, strerror(errno));
@@ -296,23 +302,110 @@ static int media_can_manage(const char *role, const char *user_id, const char *o
 }
 
 // Upload allowlist: the formats scripts/image-optimizer.sh turns into its
-// JPEG/GIF variants, checked on both the extension and the file's magic
-// bytes. Anything else - .html, .svg, .js... - would otherwise be stored and
-// served from the site's own origin. Returns 1 when `name`'s extension and
-// `data` agree on one of them.
-static int media_upload_is_allowed_image(const char *name, const unsigned char *data, size_t len) {
-    const char *ext = strrchr(name, '.');
-    if (!ext || ext == name) return 0;
+// JPEG/GIF variants, recognized by the file's magic bytes - its content, not
+// its name. Returns the extension that format is stored under (".jpg",
+// ".png", ".gif", ".webp"), or NULL for anything else: .html, .svg, .js...
+// would otherwise be stored and served from the site's own origin.
+static const char *media_image_extension(const unsigned char *data, size_t len) {
+    if (len >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF) return ".jpg";
+    if (len >= 8 && memcmp(data, "\x89PNG\r\n\x1a\n", 8) == 0) return ".png";
+    if (len >= 6 && (memcmp(data, "GIF87a", 6) == 0 || memcmp(data, "GIF89a", 6) == 0)) return ".gif";
+    if (len >= 12 && memcmp(data, "RIFF", 4) == 0 && memcmp(data + 8, "WEBP", 4) == 0) return ".webp";
+    return NULL;
+}
 
-    if (strcasecmp(ext, ".jpg") == 0 || strcasecmp(ext, ".jpeg") == 0)
-        return len >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF;
-    if (strcasecmp(ext, ".png") == 0)
-        return len >= 8 && memcmp(data, "\x89PNG\r\n\x1a\n", 8) == 0;
-    if (strcasecmp(ext, ".gif") == 0)
-        return len >= 6 && (memcmp(data, "GIF87a", 6) == 0 || memcmp(data, "GIF89a", 6) == 0);
-    if (strcasecmp(ext, ".webp") == 0)
-        return len >= 12 && memcmp(data, "RIFF", 4) == 0 && memcmp(data + 8, "WEBP", 4) == 0;
+// An uploaded file's name as it is stored: in the part before the last dot
+// (the stem) spaces and dots become '_', every character outside
+// [A-Za-z0-9_-] is dropped, and an empty result becomes "image"; the
+// extension keeps only [A-Za-z0-9] (media_name_with_extension() then makes
+// it the content's real one). Nothing that could break out of a path, a
+// URL, an HTML attribute or image-optimizer.sh's command line survives. The
+// stem is capped so "_N" and the optimizer's "_full"/"_half"... still fit.
+#define MEDIA_UPLOAD_STEM_MAX 120
+
+static void media_sanitize_upload_name(const char *raw, char *out, size_t size) {
+    const char *last_dot = strrchr(raw, '.');
+    const char *stem_end = last_dot ? last_dot : raw + strlen(raw);
+
+    size_t j = 0;
+    for (const char *p = raw; p < stem_end && j < MEDIA_UPLOAD_STEM_MAX && j + 1 < size; p++) {
+        char c = *p;
+        if (c == ' ' || c == '.') out[j++] = '_';
+        else if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                 (c >= '0' && c <= '9') || c == '-' || c == '_') out[j++] = c;
+    }
+    if (j == 0) j = (size_t)snprintf(out, size, "image");
+
+    if (last_dot && j + 1 < size) {
+        size_t dot_at = j;
+        out[j++] = '.';
+        for (const char *p = last_dot + 1; *p && j + 1 < size; p++) {
+            char c = *p;
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) out[j++] = c;
+        }
+        if (j == dot_at + 1) j = dot_at; // nothing usable after the dot
+    }
+    out[j] = '\0';
+}
+
+// Whether an earlier upload in `dirpath` already uses `stem`: its base-name
+// link (under any image extension - "photo.png" and "photo.jpg" share their
+// variants) or its _full/_half variant. lstat(), since the base name is a
+// symlink to _half.
+static int media_stem_taken(const char *dirpath, const char *stem) {
+    static const char *suffixes[] = {
+        ".jpg", ".jpeg", ".png", ".gif", ".webp",
+        "_full.jpg", "_full.gif", "_half.jpg", "_half.gif",
+    };
+    for (size_t i = 0; i < sizeof(suffixes) / sizeof(suffixes[0]); i++) {
+        char path[1024];
+        struct stat st;
+        snprintf(path, sizeof(path), "%s/%s%s", dirpath, stem, suffixes[i]);
+        if (lstat(path, &st) == 0) return 1;
+    }
     return 0;
+}
+
+// Gives `name` ("stem.ext") a stem no earlier upload in `dirpath` uses,
+// appending "_2", "_3"... - an upload never overwrites another's files.
+// Returns 0 if no free name is found.
+static int media_unique_name(const char *dirpath, char *name, size_t size) {
+    char stem[MEDIA_UPLOAD_STEM_MAX + 1], ext[32] = "";
+    const char *dot = strrchr(name, '.');
+    size_t stem_len = dot ? (size_t)(dot - name) : strlen(name);
+    if (stem_len > MEDIA_UPLOAD_STEM_MAX) stem_len = MEDIA_UPLOAD_STEM_MAX;
+    memcpy(stem, name, stem_len);
+    stem[stem_len] = '\0';
+    if (dot) snprintf(ext, sizeof(ext), "%s", dot);
+
+    if (!media_stem_taken(dirpath, stem)) return 1;
+    for (int n = 2; n < 10000; n++) {
+        char candidate[MEDIA_UPLOAD_STEM_MAX + 8];
+        snprintf(candidate, sizeof(candidate), "%s_%d", stem, n);
+        if (!media_stem_taken(dirpath, candidate)) {
+            int written = snprintf(name, size, "%s%s", candidate, ext);
+            return written > 0 && (size_t)written < size;
+        }
+    }
+    return 0;
+}
+
+// Makes `name` end in the extension of the format its content really is, so
+// the stored file is always served as what it is: "photo.jpg" holding a
+// WebP becomes "photo.webp", "photo" becomes "photo.jpg". An extension that
+// already matches is kept as written ("photo.JPEG" stays). Returns 0 if the
+// result doesn't fit in `size`.
+static int media_name_with_extension(char *name, size_t size, const char *ext) {
+    char *dot = strrchr(name, '.');
+    if (dot && dot != name) {
+        if (strcasecmp(dot, ext) == 0 ||
+            (strcmp(ext, ".jpg") == 0 && strcasecmp(dot, ".jpeg") == 0)) return 1;
+        *dot = '\0';
+    }
+    size_t len = strlen(name);
+    if (len + strlen(ext) + 1 > size) return 0;
+    memcpy(name + len, ext, strlen(ext) + 1);
+    return 1;
 }
 
 // Writes an HTML fragment (a media directory <li>) as a 200 response.
@@ -4303,19 +4396,8 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                         const MultipartPart *dir_part = multipart_find(mp, "media-directory-selected");
                         const MultipartPart *file_part = multipart_find(mp, "file");
 
-                        // Sanitize filename
                         char sanitized[256] = {0};
-                        if (file_part) {
-                            int j = 0;
-                            for (int k = 0; file_part->filename[k] && j < (int)sizeof(sanitized) - 1; k++) {
-                                char c = file_part->filename[k];
-                                if (c == ' ') sanitized[j++] = '-';
-                                else if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-                                         (c >= '0' && c <= '9') || c == '-' || c == '.' || c == '_')
-                                    sanitized[j++] = c;
-                            }
-                            sanitized[j] = '\0';
-                        }
+                        if (file_part) media_sanitize_upload_name(file_part->filename, sanitized, sizeof(sanitized));
 
                         char dir_id_buf[32] = {0};
                         if (dir_part) {
@@ -4333,13 +4415,19 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                         CmsMediaDirectory dir;
                         int dir_found = cms_get_media_directory_by_id(dir_id_buf, &dir);
 
+                        // The content decides the format; the name only follows it.
+                        const char *image_ext = file_part
+                            ? media_image_extension((const unsigned char *)file_part->data, file_part->data_len)
+                            : NULL;
+
                         if (!file_part || file_part->filename[0] == '\0') {
                             send_simple(ctx, "400 Bad Request", "Missing file");
-                        } else if (!media_file_name_valid(sanitized) ||
-                                   !media_upload_is_allowed_image(sanitized,
-                                        (const unsigned char *)file_part->data, file_part->data_len)) {
+                        } else if (!image_ext) {
                             send_simple(ctx, "415 Unsupported Media Type",
                                         "Only JPEG, PNG, GIF and WebP images can be uploaded");
+                        } else if (!media_name_with_extension(sanitized, sizeof(sanitized), image_ext) ||
+                                   !media_file_name_valid(sanitized)) {
+                            send_simple(ctx, "400 Bad Request", "Invalid file name");
                         } else if (!media_username_valid(username)) {
                             LOG_WARN("media upload: unusable username '%s' for user %s", username, user_id);
                             send_simple(ctx, "400 Bad Request", "Your account name cannot be used as a media directory");
@@ -4358,10 +4446,22 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                             snprintf(dirpath, sizeof(dirpath), "./html/content/posts/%s/%s", username, dir.name);
                             mkdir(dirpath, 0775);
 
+                            if (!media_unique_name(dirpath, sanitized, sizeof(sanitized))) {
+                                send_simple(ctx, "409 Conflict", "Could not find a free name for this file");
+                                free_multipart(mp);
+                                goto cleanup;
+                            }
+
                             // Write file
                             char filepath[1024];
                             snprintf(filepath, sizeof(filepath), "%s/%s", dirpath, sanitized);
-                            FILE *f = fopen(filepath, "wb");
+                            // A new file only: O_EXCL fails on any existing name and
+                            // O_NOFOLLOW on a symlink, so an upload can never write
+                            // through an earlier upload's base-name link into its
+                            // _half variant, or over any other file.
+                            int fd = open(filepath, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0644);
+                            FILE *f = fd >= 0 ? fdopen(fd, "wb") : NULL;
+                            if (fd >= 0 && !f) close(fd);
                             int write_ok = 0;
                             if (f) {
                                 write_ok = fwrite(file_part->data, 1, file_part->data_len, f) == file_part->data_len;

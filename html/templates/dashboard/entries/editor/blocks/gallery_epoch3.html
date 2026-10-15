@@ -6,7 +6,7 @@
         <span class="boat-rudder-entry-editor-block__type-label boat-rudder-entry-editor-block__type-label--gallery">&#9632; Gallery</span>
         <div class="boat-rudder-entry-editor-block__header-actions">
           <button class="boat-rudder-entry-editor__meta-btn boat-rudder-btn boat-rudder-btn--sm"
-                  onclick="event.stopPropagation();openGalleryForBlock(this)">Select photos</button>
+                  onclick="event.stopPropagation();openGalleryForBlock(this)">Add photos</button>
           <button class="boat-rudder-entry-editor-block__move-btn boat-rudder-btn boat-rudder-btn--ghost boat-rudder-btn--icon" onclick="moveBlockUp(this)" title="Move up">&#8679;</button>
           <button class="boat-rudder-entry-editor-block__move-btn boat-rudder-btn boat-rudder-btn--ghost boat-rudder-btn--icon" onclick="moveBlockDown(this)" title="Move down">&#8681;</button>
           <span class="boat-rudder-entry-editor-block__drag">&#8942;</span>
@@ -17,9 +17,7 @@
       <div class="boat-rudder-entry-editor-block__preview"></div>
 
       <div class="boat-rudder-entry-editor-block__body">
-        <div class="boat-rudder-entry-editor__gallery-preview">
-          <span class="boat-rudder-entry-editor__gallery-empty">No images selected</span>
-        </div>
+        <div class="boat-rudder-entry-editor__gallery-preview boat-rudder-entry-editor-gallery"></div>
 
         <div style="display:none">
 %s
