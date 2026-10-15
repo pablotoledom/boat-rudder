@@ -183,7 +183,9 @@ Updating a site means compiling and running new code as root, so the updater
   absolute paths, `..`, more than one top directory and archives over 1 GB; files are extracted
   without their archived owners.
 - Only paths in the installed or the new manifest are written or deleted; `html/content/`,
-  `configs/`, `ssl/`, `data/` and anything else on the host are out of reach.
+  `configs/`, `ssl/`, `data/` and anything else on the host are out of reach. A deletion also
+  needs the installed version's official signed package to have shipped the file, so a site's
+  own additions installed from its repository are never deleted.
 - Every install and rollback is recorded in `.boat-rudder/history.jsonl`.
 - `/dashboard/settings/updates` (admin only) checks GitHub by running `curl` with a fixed command
   line - `update_repo` is checked against `[A-Za-z0-9._-]/[A-Za-z0-9._-]` before it goes in - and

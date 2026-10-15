@@ -418,7 +418,9 @@ static bool rollback_target(char *from, size_t from_size, char *date, size_t dat
     char *to = strstr(newest, "-to-");
     if (!newest[0] || !to || strlen(newest) < 17 || strcmp(to + 4, BOAT_RUDDER_VERSION) != 0) return false;
     *to = '\0';
-    snprintf(from, from_size, "%s", newest + 16);
+    size_t from_len = strlen(newest + 16);
+    if (from_len == 0 || from_len >= from_size) return false;   // not a version this page made
+    memcpy(from, newest + 16, from_len + 1);
     snprintf(date, date_size, "%.4s-%.2s-%.2s %.2s:%.2s UTC", newest, newest + 4, newest + 6, newest + 9, newest + 11);
     long parts[4];
     return parse_version(from, parts) > 0;

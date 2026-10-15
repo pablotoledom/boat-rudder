@@ -10,6 +10,29 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *A
 
 ---
 
+## v0.0.6
+### 2026-10-15
+
+### Updates never delete a site's own files
+
+**Fixed**
+- An update deleted every file of the installed manifest the new version no longer ships - and
+  a site installed from its own repository has its additions in that manifest too (uploaded
+  fonts, its own theme files), so updating it would have deleted them. Now a file is deleted
+  only if the installed version's official, signed package shipped it: the updater fetches that
+  release and checks. The site's own files are kept, listed as *this site's own*, and leave the
+  manifest; if the release can't be had, nothing is deleted.
+- `uninstall.sh` left `/usr/local/sbin/boat-rudder-update` (the updater's link) and
+  `/etc/logrotate.d/boat-rudder` behind; it removes both now.
+
+### Build warnings
+
+**Fixed**
+- The Release build (what `install.sh` and the updater compile) printed two `-Wformat-truncation`
+  warnings: in `tests/browser_detection_bson_test.c` (an error message, now capped to its
+  buffer) and in `updates_admin.c` (a backup name longer than a version is now skipped instead of
+  cut). Release and Debug builds are warning-free again.
+
 ## v0.0.5
 ### 2026-10-15
 

@@ -268,10 +268,12 @@ Stops and completely removes the systemd service and all installed files.
 5. Removes `/usr/local/bin/boat-rudder/` recursively - **including** the host's
    `configs/settings.conf`, `ssl/`, `data/` and every uploaded file under `html/content/`. Back
    up first if any of it matters.
-6. Lists any remaining units matching `boat-rudder` for verification.
+6. Removes the updater's link `/usr/local/sbin/boat-rudder-update` (when it still points into the
+   install) and `/etc/logrotate.d/boat-rudder`.
+7. Lists any remaining units matching `boat-rudder` for verification.
 
-It does **not** remove `/etc/logrotate.d/boat-rudder` nor `/var/log/boat-rudder.log*`; delete
-them by hand if wanted.
+It does **not** remove `/var/log/boat-rudder.log*` nor the database; delete them by hand if
+wanted.
 
 **Delegates to:** `scripts/uninstall.sh`
 
@@ -513,7 +515,13 @@ Stages of `install` - everything that can fail runs before the site is touched:
    package's `VERSION`. A failed build stops here, with the log; the service is never stopped.
 3. **Plan**: the installed manifest against the new one gives the files to replace, add and
    delete. A system file whose content differs from the installed manifest was edited on the host:
-   listed, replaced, kept in the backup. Files outside both manifests are never touched. Asks to
+   listed, replaced, kept in the backup. Files outside both manifests are never touched. A file
+   the new version no longer ships is deleted only if the **installed version's official package**
+   shipped it: the updater fetches that signed release and checks. The installed manifest lists
+   everything `install.sh` found in the tree it ran from, so a site installed from its own
+   repository has its additions there too - uploaded fonts, its own theme files - and those are
+   kept (*this site's own*) and leave the manifest. If that release can't be had - no network, a
+   version never released - nothing is deleted and the files are listed as unconfirmed. Asks to
    continue (unless `--yes`).
 4. **Backup** to `.boat-rudder/backups/<date>-<from>-to-<to>/`: the files to replace or delete,
    the list of files to add, the old manifest, `VERSION` and key, and a `mongodump` of the site

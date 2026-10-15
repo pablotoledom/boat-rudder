@@ -316,6 +316,43 @@ make_plan() {   # make_plan <dir>
     return 0
 }
 
+# A file the new version no longer ships is deleted only if the installed
+# version's official package shipped it. The installed manifest lists every
+# file of the tree install.sh ran from - for a site kept in its own repository,
+# that includes the site's additions (uploaded fonts, its own theme files...),
+# which no release ships and an update must not take away. So the installed
+# version's signed release is fetched and verified, and only the paths in it
+# stay in plan/delete; the rest move to plan/site. When it can't be had - no
+# network, a version that was never released - nothing is deleted
+# (plan/unconfirmed).
+confirm_deletions() {   # confirm_deletions <dir> <installed version>
+    local dir="$1" version="$2" line tar_url sig_url old="$1/official"
+    : > "$dir/plan/site"; : > "$dir/plan/unconfirmed"
+    [ -s "$dir/plan/delete" ] || return 0
+
+    log "Checking the files to delete against the official $version package ..."
+    mkdir -p "$old"
+    line="$(latest_release 2>/dev/null | awk -v v="$version" '$1 == v')" || line=""
+    if [ -n "$line" ]; then
+        read -r _ tar_url sig_url <<< "$line"
+        if curl -fsSL --proto '=https' --max-filesize "$MAX_PACKAGE_BYTES" -o "$old/pkg.tar.gz" "$tar_url" &&
+           curl -fsSL --proto '=https' --max-filesize 65536 -o "$old/pkg.tar.gz.minisig" "$sig_url" &&
+           "$MINISIGN" -Vqm "$old/pkg.tar.gz" -x "$old/pkg.tar.gz.minisig" -p "$STATE/minisign.pub" &&
+           tar -tzf "$old/pkg.tar.gz" | sed -n 's|^[^/]*/||p' | grep -v '/$' | LC_ALL=C sort -u > "$old/files"; then
+            LC_ALL=C comm -23 "$dir/plan/delete" "$old/files" > "$dir/plan/site"
+            LC_ALL=C comm -12 "$dir/plan/delete" "$old/files" > "$dir/plan/delete.confirmed"
+            mv -f "$dir/plan/delete.confirmed" "$dir/plan/delete"
+            rm -rf "$old"
+            return 0
+        fi
+    fi
+    warn "couldn't get the official, signed $version package - nothing will be deleted"
+    mv -f "$dir/plan/delete" "$dir/plan/unconfirmed"
+    : > "$dir/plan/delete"
+    rm -rf "$old"
+    return 0
+}
+
 show_plan() {   # show_plan <dir> <from> <to>
     local dir="$1"
     log "Update $2 -> $3: $(wc -l < "$dir/plan/replace") to replace, $(wc -l < "$dir/plan/add") to add, $(wc -l < "$dir/plan/delete") to delete."
@@ -338,6 +375,16 @@ show_plan() {   # show_plan <dir> <from> <to>
         log ""
         log "No longer part of the system - deleted (kept in the backup):"
         sed 's/^/  /' "$dir/plan/delete"
+    fi
+    if [ -s "$dir/plan/site" ]; then
+        log ""
+        log "Not in the official $2 package - this site's own, kept (and no longer system files):"
+        sed 's/^/  /' "$dir/plan/site"
+    fi
+    if [ -s "$dir/plan/unconfirmed" ]; then
+        log ""
+        log "Not shipped by $3, but not confirmed as system files - kept:"
+        sed 's/^/  /' "$dir/plan/unconfirmed"
     fi
 }
 
@@ -485,6 +532,7 @@ cmd_install() {
 
     step "Plan"
     make_plan "$dir"
+    confirm_deletions "$dir" "$from"
     show_plan "$dir" "$from" "$to"
     confirm "Apply the update to $to?"
 
