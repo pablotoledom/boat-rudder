@@ -142,6 +142,16 @@ set(SOURCES
 
 add_executable(boat-rudder ${SOURCES})
 
+# The version a build reports (`boat-rudder --version`, the startup log line):
+# the first line of ./VERSION, which the updater also installs and compares
+# (develop_docs/plans/update-system-plan.md). Changing the file reconfigures.
+set(BOAT_RUDDER_VERSION "unknown")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION")
+    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" BOAT_RUDDER_VERSION LIMIT_COUNT 1)
+endif()
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION")
+target_compile_definitions(boat-rudder PRIVATE BOAT_RUDDER_VERSION="${BOAT_RUDDER_VERSION}")
+
 target_include_directories(boat-rudder PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${OPENSSL_INCLUDE_DIR}

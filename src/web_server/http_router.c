@@ -4423,6 +4423,17 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                         if (!file_part || file_part->filename[0] == '\0') {
                             send_simple(ctx, "400 Bad Request", "Missing file");
                         } else if (!image_ext) {
+                            // Not a JPEG, PNG, GIF or WebP, whatever its name says:
+                            // its first bytes show what it is (AVIF, HEIC, ...).
+                            const unsigned char *d = (const unsigned char *)file_part->data;
+                            size_t n = file_part->data_len;
+                            LOG_WARN("media upload rejected: '%s' (%zu bytes, starts "
+                                     "%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x)",
+                                     file_part->filename, n,
+                                     n > 0 ? d[0] : 0, n > 1 ? d[1] : 0, n > 2 ? d[2] : 0,
+                                     n > 3 ? d[3] : 0, n > 4 ? d[4] : 0, n > 5 ? d[5] : 0,
+                                     n > 6 ? d[6] : 0, n > 7 ? d[7] : 0, n > 8 ? d[8] : 0,
+                                     n > 9 ? d[9] : 0, n > 10 ? d[10] : 0, n > 11 ? d[11] : 0);
                             send_simple(ctx, "415 Unsupported Media Type",
                                         "Only JPEG, PNG, GIF and WebP images can be uploaded");
                         } else if (!media_name_with_extension(sanitized, sizeof(sanitized), image_ext) ||

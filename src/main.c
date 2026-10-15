@@ -35,13 +35,19 @@ static void sigchld_handler(int s) {
     errno = saved;
 }
 
+#ifndef BOAT_RUDDER_VERSION
+#define BOAT_RUDDER_VERSION "unknown"   // set by CMakeLists.txt from ./VERSION
+#endif
+
 static void print_usage(const char *prog) {
     fprintf(stderr,
             "Usage: %s [-c <config>] <root_directory>\n"
+            "       %s --version\n"
             "\n"
             "  -c <config>      Path to config file (default: ./configs/settings.conf)\n"
-            "  <root_directory> Directory to serve\n",
-            prog);
+            "  <root_directory> Directory to serve\n"
+            "  --version        Print the version and exit\n",
+            prog, prog);
 }
 
 int main(int argc, char *argv[]) {
@@ -50,8 +56,13 @@ int main(int argc, char *argv[]) {
     const char *config_path  = "./configs/settings.conf";
     const char *root_arg     = NULL;
 
-    // Parse arguments: optional -c <path> before the mandatory root_directory.
+    // Parse arguments: optional -c <path> before the mandatory root_directory,
+    // or --version alone (the updater's smoke test of a fresh build).
     for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--version") == 0) {
+            printf("boat-rudder %s\n", BOAT_RUDDER_VERSION);
+            return EXIT_SUCCESS;
+        }
         if (strcmp(argv[i], "-c") == 0) {
             if (i + 1 >= argc) {
                 fprintf(stderr, "Error: -c requires a path argument\n");
@@ -92,7 +103,7 @@ int main(int argc, char *argv[]) {
     }
 
     log_level = verbose_level;
-    LOG_INFO("Boat Rudder starting");
+    LOG_INFO("Boat Rudder %s starting", BOAT_RUDDER_VERSION);
     LOG_INFO("Config         : %s", config_path);
     LOG_INFO("Root directory : %s", root_directory);
     LOG_INFO("HTTP port      : %d", http_port);

@@ -171,6 +171,7 @@ boat-rudder/
 │                                        # qr/ cache (gitignored)
 ├── scripts/
 │   ├── image-optimizer.sh               # Generates 5 image variants per upload via ImageMagick
+│   ├── manifest.sh                      # System file manifest: create / adopt / verify (scripts.md)
 │   ├── compile_debug.sh / compile_prod.sh / run_debug.sh / install.sh / uninstall.sh / clean.sh
 │   ├── create_local_cert.sh             # Self-signed TLS certificate for local development
 │   ├── mongodb_start.sh / mongodb_dump.sh / mongodb_restore.sh
@@ -183,8 +184,14 @@ boat-rudder/
 │   └── GeoLite2-Country.mmdb            # Optional GeoIP database (analytics.md)
 ├── ssl/                                 # TLS certificate and key (optional)
 ├── boat_rudder_builder.sh               # Entry point for every script (scripts.md)
+├── VERSION                              # The version: --version, the startup log, the updater
 └── CMakeLists.txt                       # Build definition
 ```
+
+An **install** (`/usr/local/bin/boat-rudder/`) has the same `boat-rudder`, `scripts/`, `html/`,
+`configs/`, `ssl/` and `data/`, plus `.boat-rudder/`: its `VERSION` and `manifest.sha256`, the
+SHA-256 of every system file installed - the files an update may replace, and the only ones
+([scripts.md](scripts.md#scriptsmanifestsh)).
 
 Also tracked but not part of the build or runtime: `design/` (`.xcf` image sources for theme
 artwork), `data/mongo_example.c` and `data/querys.json` (scratch examples), and `db_backup/`,

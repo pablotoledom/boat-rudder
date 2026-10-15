@@ -9,8 +9,34 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *A
 
 ---
 
-## v0.0.1
+## v0.0.4
+### 2026-10-14
 
+### Update system, phase 1: versions and manifests
+
+**Added**
+- `VERSION` at the root of the source; `boat-rudder --version` prints it, and the startup log line
+  names it.
+- `scripts/manifest.sh`: the manifest of a version's system files (binary, `scripts/`,
+  `html/templates`, `html/themes`, `html/assets`, the default favicons) with their SHA-256, in
+  `sha256sum` format - `create` from a built source tree, `adopt` for an existing install (reports
+  files edited on the host, missing, or not part of the version), `verify` an install against it.
+  Never lists `html/content/`, `configs/`, `ssl/`, `data/` or the uploaded favicons and fonts.
+- `install.sh` writes `.boat-rudder/VERSION` and `.boat-rudder/manifest.sha256` into the install,
+  and installs `scripts/manifest.sh`. Groundwork for updates with rollback
+  ([update-system-plan.md](develop_docs/plans/update-system-plan.md)).
+
+### Media uploads on an installed server
+
+**Fixed**
+- `install.sh` didn't copy `scripts/image-optimizer.sh`, which the server runs on every media
+  upload, so on an installed server every upload failed with `415`. It is installed now, and the
+  installer warns when `magick`, `jpegoptim` or `gifsicle` is missing.
+- A media upload rejected for its type is logged with its name and first bytes, which tells a
+  mislabeled file (a WebP, AVIF or HEIC saved as `.jpg`) from a real problem.
+
+
+## v0.0.3
 ### 2026-10-14
 ### Gallery block editing
 
@@ -45,6 +71,7 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *A
   `_half` variant (written through its base-name symlink) and added a second media record for
   the same files, so deleting either removed both pictures.
 
+## v0.0.2
 ### 2026-10-11
 ### Browser detection from the dashboard
 

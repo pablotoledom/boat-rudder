@@ -192,6 +192,10 @@ Compiles the project for production and installs it as a **systemd service**.
 2. Creates `/usr/local/bin/boat-rudder/` and copies into it, straight from the project root:
    - `boat-rudder` - with `install -m 755`, which replaces the file instead of writing into it,
      so it works while the old binary is running ("Text file busy" with `cp`).
+   - `scripts/image-optimizer.sh` - the server runs it (relative to its working directory) on
+     every media upload; without it every upload fails with `415`. The installer also warns when
+     one of its tools - `magick`, `jpegoptim`, `gifsicle` - is missing, which fails the same way.
+   - `scripts/manifest.sh` - to check the install against its manifest on the host (below).
    - `configs/settings.conf` - **only on the first install.** It is per-host (ports, WAP gateway
      addresses, log level…), so a reinstall keeps the installed file, writes the repository's
      version next to it as `settings.conf.dist`, and lists every key the installed file lacks
@@ -203,6 +207,10 @@ Compiles the project for production and installs it as a **systemd service**.
      visitor country will be "Unknown" ([analytics.md](analytics.md#geoip-optional)).
    - `ssl/` - **only seeded on the first install** (when the installed `ssl/` is empty), so
      certificates renewed in place on the server are never overwritten by a stale checkout.
+   - `.boat-rudder/` - written last, once every file is in place: `VERSION` and
+     `manifest.sha256`, the manifest of the system files just installed
+     ([`scripts/manifest.sh`](#scriptsmanifestsh)). The updater compares against it, and it is the
+     only list of files an update may replace or delete.
 
    This is the one place where the content tree really is copied: the installed service runs
    from `/usr/local/bin/boat-rudder/`, independent of the source checkout.
@@ -400,6 +408,7 @@ These scripts are not meant to be called directly but can be if needed. All of t
 | `scripts/install.sh` | `install` | `sudo ./scripts/install.sh` |
 | `scripts/uninstall.sh` | `uninstall` | `sudo ./scripts/uninstall.sh` |
 | `scripts/image-optimizer.sh` | the server, via `popen()` on every media upload | `./scripts/image-optimizer.sh <in_dir> <out_dir> [file]` |
+| `scripts/manifest.sh` | `install` (`create`); manual on a host (`adopt`, `verify`) | `./scripts/manifest.sh create\|adopt\|verify …` |
 | `scripts/mongodb_start.sh` | nothing (manual) | `./scripts/mongodb_start.sh` |
 | `scripts/mongodb_dump.sh` | nothing (manual) | `./scripts/mongodb_dump.sh` |
 | `scripts/mongodb_restore.sh` | nothing (manual) | `./scripts/mongodb_restore.sh` |
@@ -411,9 +420,31 @@ These scripts are not meant to be called directly but can be if needed. All of t
 ### `scripts/image-optimizer.sh`
 
 Invoked by the server itself (not by `boat_rudder_builder.sh`) after every media upload. Generates 5 variants
-per image - `_full`, `_half`, `_small`, `_medium`, `_micro` - deletes the original; only the five variants are left. Requires `imagemagick`, `jpegoptim` and `gifsicle`; without them
-uploads still succeed but no variants are produced, so thumbnails and the retro epochs break.
-Full details in [media-admin.md](media-admin.md).
+per image - `_full`, `_half`, `_small`, `_medium`, `_micro` - deletes the original; only the five variants are left. Requires `imagemagick`, `jpegoptim` and `gifsicle`; when the script
+or one of them is missing, no variant is written and the server rejects the upload with `415`
+(the raw file is deleted). Full details in [media-admin.md](media-admin.md).
+
+### `scripts/manifest.sh`
+
+The list of a version's **system files** - the binary, `scripts/image-optimizer.sh` and
+`scripts/manifest.sh`, the two default favicons, and every file under `html/templates/`,
+`html/themes/` and `html/assets/` - each with its SHA-256, in `sha256sum` format with paths
+relative to the install directory (`.boat-rudder/manifest.sha256`). `html/content/`, `configs/`,
+`ssl/`, `data/`, the uploaded favicons and fonts are the site's and never listed. Part of the
+update system ([update-system-plan.md](../plans/update-system-plan.md)).
+
+| Command | Does |
+|---|---|
+| `manifest.sh create [<source>]` | Prints the manifest of a built source tree (binary at `bin/boat-rudder`); `install.sh` writes it to `.boat-rudder/` |
+| `sudo manifest.sh adopt <install> [<source>]` | One-off, for an install made before manifests: writes `.boat-rudder/VERSION` and `manifest.sha256` from the source of the version it runs, and reports files **edited on the host**, **missing**, and **not part of the version** (added on the host, or left over). The installed binary is listed with its own hash: builds aren't byte-reproducible |
+| `manifest.sh verify <install>` | Modified and missing system files; exits `1` if any. The same check as `cd <install> && sha256sum -c .boat-rudder/manifest.sha256` |
+
+Adopting the production install, from the checkout of the version it runs:
+
+```bash
+cd /usr/local/src/<checkout>
+sudo ./scripts/manifest.sh adopt /usr/local/bin/boat-rudder
+```
 
 ### MongoDB helpers
 
