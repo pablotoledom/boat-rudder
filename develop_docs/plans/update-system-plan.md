@@ -1,7 +1,9 @@
 # Updates and Rollback - Plan
 
-> **Status**: approved (2026-10-14). Phase 1 implemented (2026-10-14): `VERSION`, `--version`,
-> `scripts/manifest.sh`, `install.sh` writing `.boat-rudder/`. Phases 2-4 not implemented. References: [scripts.md](../reference/scripts.md),
+> **Status**: approved (2026-10-14). Phases 1-3 implemented (2026-10-14): `VERSION`, `--version`,
+> `scripts/manifest.sh`, `install.sh` writing `.boat-rudder/`; `scripts/release.sh`;
+> `scripts/boat-rudder-update`. Phase 4 (dashboard) not implemented. Where the implementation
+> differs from this plan, [scripts.md](../reference/scripts.md) describes what it does. References: [scripts.md](../reference/scripts.md),
 > [security.md](../reference/security.md), [dashboard.md](../reference/dashboard.md).
 
 Today a site is updated by hand: copy the source to the host, run `install.sh`, which compiles and
@@ -57,7 +59,7 @@ whatever directory it is in - is outside its reach.
     ├── minisign.pub         ← the release signing key
     ├── staging/<version>/   ← src/ and build/ of an update in progress
     ├── backups/<date>-<from>-to-<to>/
-    └── history.json
+    └── history.jsonl
 ```
 
 ---
@@ -75,10 +77,11 @@ guaranteed stable, so they can't carry a signature. Releases instead attach thei
   `.boat-rudder/minisign.pub`. A package whose signature doesn't verify against the **installed**
   key is rejected, whichever way it arrived.
 - **Key rotation**: a version may ship a new public key only when it is itself signed with the
-  current one; the updater then installs the new key.
+  current one; the updater then installs the new key (a rollback restores the old one).
 
-The package also carries `VERSION` and a small `release.json`: the oldest version it can update
-from and the system packages it needs (`cmake`, `libmongoc`, `magick`, `jpegoptim`, `gifsicle`...).
+The package also carries `VERSION`. *(Not implemented: a `release.json` with the oldest version a
+package can update from and the system packages it needs - the updater checks the build
+prerequisites itself, and nothing has needed a minimum version yet.)*
 
 ---
 
@@ -97,8 +100,7 @@ from and the system packages it needs (`cmake`, `libmongoc`, `magick`, `jpegopti
 
 ### Stages - everything that can fail happens before the site is touched
 
-1. **Verify**: signature against `.boat-rudder/minisign.pub`; `release.json` (platform, minimum
-   source version).
+1. **Verify**: signature against `.boat-rudder/minisign.pub`.
 2. **Extract** into `staging/<version>/src/`, refusing absolute paths, `..`, symlinks, devices and
    archives over a size limit.
 3. **Prerequisites**: every tool and library the version needs is present - else stop with the
@@ -118,7 +120,7 @@ from and the system packages it needs (`cmake`, `libmongoc`, `magick`, `jpegopti
 ## 5. Applying an update
 
 1. **Backup** to `.boat-rudder/backups/<date>-<from>-to-<to>/`: the current content of every file to
-   replace or delete (`files.tar.gz`), the plan (`plan.json`, including the files to add), and a
+   replace or delete (`files.tar.gz`), the list of files to add (`added`), the old manifest, `VERSION` and key, and a
    `mongodump` of the site database.
 2. Stop the service - for seconds only, the build is already done - so no request sees a mix of old
    and new templates.
@@ -127,7 +129,7 @@ from and the system packages it needs (`cmake`, `libmongoc`, `magick`, `jpegopti
 4. Start the service.
 5. **Health check** (up to ~30 s): `/` and `/login` answer, the active theme's
    `styles_epoch3.css` is served, the log shows MongoDB connected.
-6. Pass: record in `history.json`, delete `staging/<version>/`. Fail: **automatic rollback** (§6),
+6. Pass: record in `history.jsonl`, delete `staging/<version>/`. Fail: **automatic rollback** (§6),
    then record the failure.
 
 The updater replaces itself like any file in `scripts/`: through `rename()`, so the running copy
@@ -141,7 +143,7 @@ From an update's backup:
 
 1. Stop the service.
 2. Restore `files.tar.gz` (the replaced and deleted files).
-3. Delete the files the update added (`plan.json`).
+3. Delete the files the update added (`added`).
 4. Restore the previous `manifest.sha256` and `VERSION`.
 5. Start, health check.
 
@@ -175,7 +177,7 @@ reconnects on its own across the restart.
 - Downloads only over HTTPS from `github.com` / `api.github.com`; the signature, not the transport,
   is what's trusted.
 - Archive extraction as in §4 (zip-slip, symlinks, size).
-- Every run is logged in `history.json` and the server log: who, what version, from where, result.
+- Every run is logged in `history.jsonl` and the server log: who, what version, from where, result.
 - The dashboard upload goes through the existing multipart limits; the updater, not the HTTP
   server, reads the package.
 
@@ -186,8 +188,8 @@ reconnects on its own across the restart.
 | Phase | Content | Result |
 |---|---|---|
 | 1. Baseline - **done** | `VERSION` and `boat-rudder --version`; `scripts/manifest.sh` (`create`, `adopt`, `verify`); `install.sh` writes `.boat-rudder/` (`VERSION`, `manifest.sha256`, and `minisign.pub` once phase 2 adds it); `manifest.sh adopt` builds the manifest of an existing install from the source of its version and reports host edits ([scripts.md](../reference/scripts.md#scriptsmanifestsh)) | Every install knows exactly what it is |
-| 2. Releases | Signing key pair; `scripts/release.sh` | Signed source packages on GitHub |
-| 3. Command-line updater | `boat-rudder-update`: check, install, rollback, status, history - §4-§6 | Safe updates and rollbacks over SSH |
+| 2. Releases - **done** | Signing key pair; `scripts/release.sh` ([scripts.md](../reference/scripts.md#scriptsreleasesh)) | Signed source packages on GitHub |
+| 3. Command-line updater - **done** | `boat-rudder-update`: check, install, rollback, status, history - §4-§6 ([scripts.md](../reference/scripts.md#scriptsboat-rudder-update)) | Safe updates and rollbacks over SSH |
 | 4. Dashboard | `/dashboard/settings/updates`, `boat-rudder-update.service` | The same from the browser |
 
 Phases 1-3 remove the risk; phase 4 is convenience.

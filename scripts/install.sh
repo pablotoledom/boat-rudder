@@ -43,8 +43,12 @@ install -m 755 ./bin/boat-rudder "$INSTALL_DIR/boat-rudder"
 # checked too, since a missing one fails the same way.
 mkdir -p "$INSTALL_DIR/scripts"
 install -m 755 ./scripts/image-optimizer.sh "$INSTALL_DIR/scripts/image-optimizer.sh"
-# manifest.sh checks an install against its manifest ("verify") on the host.
+# manifest.sh checks an install against its manifest ("verify") on the host;
+# boat-rudder-update updates it from signed releases, and is linked into
+# /usr/local/sbin so `sudo boat-rudder-update ...` works from anywhere.
 install -m 755 ./scripts/manifest.sh "$INSTALL_DIR/scripts/manifest.sh"
+install -m 755 ./scripts/boat-rudder-update "$INSTALL_DIR/scripts/boat-rudder-update"
+ln -sfn "$INSTALL_DIR/scripts/boat-rudder-update" /usr/local/sbin/boat-rudder-update
 for tool in magick jpegoptim gifsicle; do
     command -v "$tool" > /dev/null 2>&1 ||
         echo "Warning: '$tool' not found - media uploads will fail until it is installed."
@@ -74,12 +78,27 @@ else
     fi
 fi
 
-# html/ is required at runtime. Merged over the installed copy: templates
-# and themes are updated, and files that only exist there - media uploaded
-# from the dashboard into html/content - are left alone.
+# html/ is required at runtime. Everything but html/content/ is merged over
+# the installed copy: templates, themes and assets are updated, and files that
+# only exist there (uploaded fonts...) are left alone. html/content/ is the
+# site's own - posts, uploads, generated QR codes - and the repository's copy
+# only sample content, so it is seeded on the first install only: copied over
+# a live site it would replace same-named files of the site with the samples.
 if [ -d ./html ]; then
     mkdir -p "$INSTALL_DIR/html"
-    cp -rT ./html "$INSTALL_DIR/html"
+    for entry in ./html/* ./html/.[!.]*; do
+        [ -e "$entry" ] || continue
+        [ "$(basename "$entry")" = "content" ] && continue
+        if [ -d "$entry" ]; then
+            cp -rT "$entry" "$INSTALL_DIR/html/$(basename "$entry")"
+        else
+            cp "$entry" "$INSTALL_DIR/html/"
+        fi
+    done
+    if [ -d ./html/content ] && [ ! -d "$INSTALL_DIR/html/content" ]; then
+        cp -rT ./html/content "$INSTALL_DIR/html/content"
+        echo "Seeded html/content/ with the sample content."
+    fi
 else
     mkdir -p "$INSTALL_DIR/html"
     echo "Warning: html/ not found. Add your retro-compatible CMS files to $INSTALL_DIR/html/"

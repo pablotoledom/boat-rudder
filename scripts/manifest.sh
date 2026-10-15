@@ -53,7 +53,8 @@ system_files() {
     {
         printf 'boat-rudder\tbin/boat-rudder\n'
         local f
-        for f in scripts/image-optimizer.sh scripts/manifest.sh html/favicon.ico html/favicon-nb.ico; do
+        for f in scripts/image-optimizer.sh scripts/manifest.sh scripts/boat-rudder-update \
+                 html/favicon.ico html/favicon-nb.ico; do
             [ -f "$src/$f" ] && printf '%s\t%s\n' "$f" "$f"
         done
         (cd "$src" && find html/templates html/themes html/assets -type f -print) |

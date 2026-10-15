@@ -1,0 +1,543 @@
+#!/bin/bash
+# Boat Rudder updater (develop_docs/plans/update-system-plan.md, phase 3).
+#
+# Updates an installed site from signed source - a GitHub release of the
+# project, or the same package uploaded by hand - compiling it on this host,
+# replacing only the system files listed in .boat-rudder/manifest.sha256, and
+# rolling back on its own when the site doesn't come back healthy.
+#
+#   boat-rudder-update status
+#   boat-rudder-update check
+#   boat-rudder-update install <version>|latest [--yes] [--force]
+#   boat-rudder-update install --file <pkg.tar.gz> --sig <pkg.tar.gz.minisig> [--yes] [--force]
+#   boat-rudder-update rollback [--restore-db] [--yes]
+#   boat-rudder-update history
+#
+# --yes skips the confirmation prompt (required when stdin is not a terminal);
+# --force reinstalls the installed version, or installs an older one.
+#
+# Everything that can fail - download, signature, extraction, build - happens
+# in .boat-rudder/staging/ while the site keeps running. Only then is the
+# service stopped, for the seconds it takes to swap the files.
+#
+# Environment overrides, for tests and unusual hosts:
+#   BR_INSTALL_DIR   install directory            (/usr/local/bin/boat-rudder)
+#   BR_REPO          GitHub owner/name             (jpablotoledom/boat-rudder)
+#   BR_SERVICE       systemd unit                  (boat-rudder)
+#   BR_SERVICECTL    service control command       (systemctl)
+#   BR_MINISIGN      minisign binary               (minisign)
+#   BR_HEALTH_BASE   base URL of the health check  (from configs/settings.conf)
+#   BR_HEALTH_TIMEOUT seconds to wait for health   (30)
+#   BR_KEEP_BACKUPS  update backups kept           (5)
+#   BR_NO_DB_BACKUP=1  skip mongodump/mongorestore
+#   BR_ALLOW_NONROOT=1 don't require root
+set -euo pipefail
+# With pipefail, `producer | head -n1` (or grep -q, or a loop that breaks)
+# can fail with SIGPIPE when the consumer stops reading first, and `set -e`
+# then ends the script silently. Variables are fed with here-strings, and
+# consumers read their whole input, wherever that could happen.
+
+INSTALL_DIR="${BR_INSTALL_DIR:-/usr/local/bin/boat-rudder}"
+REPO="${BR_REPO:-jpablotoledom/boat-rudder}"
+SERVICE="${BR_SERVICE:-boat-rudder}"
+SERVICECTL="${BR_SERVICECTL:-systemctl}"
+MINISIGN="${BR_MINISIGN:-minisign}"
+HEALTH_TIMEOUT="${BR_HEALTH_TIMEOUT:-30}"
+KEEP_BACKUPS="${BR_KEEP_BACKUPS:-5}"
+
+STATE="$INSTALL_DIR/.boat-rudder"
+MAX_PACKAGE_BYTES=$((200 * 1024 * 1024))      # compressed
+MAX_EXTRACTED_BYTES=$((1024 * 1024 * 1024))   # uncompressed
+UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"
+
+# ---- Output and state --------------------------------------------------------
+
+log()  { printf '%s\n' "$*"; }
+step() { printf '\n==> %s\n' "$*"; }
+warn() { printf 'Warning: %s\n' "$*" >&2; }
+die()  { printf 'boat-rudder-update: %s\n' "$*" >&2; exit 1; }
+
+usage() {
+    sed -n '/^#   boat-rudder-update status/,/^# --force/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2
+    exit 2
+}
+
+cfg() {   # value of a configs/settings.conf key, or $2
+    local v
+    v="$(sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$INSTALL_DIR/configs/settings.conf" 2>/dev/null |
+         tail -n1 | tr -d '\r' | sed 's/[[:space:]]*#.*$//; s/[[:space:]]*$//')"
+    printf '%s' "${v:-${2:-}}"
+}
+
+installed_version() { head -n1 "$STATE/VERSION" 2>/dev/null || echo "unknown"; }
+
+json_str() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\n\t' '  '; }
+
+record() {   # record <action> <from> <to> <source> <result> <backup> <detail>
+    printf '{"time":"%s","action":"%s","from":"%s","to":"%s","source":"%s","result":"%s","backup":"%s","detail":"%s"}\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(json_str "$1")" "$(json_str "$2")" "$(json_str "$3")" \
+        "$(json_str "$4")" "$(json_str "$5")" "$(json_str "$6")" "$(json_str "$7")" >> "$STATE/history.jsonl"
+}
+
+require_root() {
+    [ "${BR_ALLOW_NONROOT:-0}" = "1" ] || [ "$(id -u)" -eq 0 ] || die "run as root (sudo)"
+}
+
+require_install() {
+    [ -x "$INSTALL_DIR/boat-rudder" ] || die "no Boat Rudder install at $INSTALL_DIR"
+    [ -f "$STATE/manifest.sha256" ] ||
+        die "$INSTALL_DIR has no manifest - run 'scripts/manifest.sh adopt $INSTALL_DIR' from the source of the installed version first"
+}
+
+lock() {
+    exec 9> "$STATE/update.lock"
+    flock -n 9 || die "another update or rollback is running"
+}
+
+confirm() {   # confirm <question>
+    [ "$YES" = "1" ] && return 0
+    [ -t 0 ] || die "not a terminal: pass --yes to confirm"
+    local answer
+    read -r -p "$1 [y/N] " answer
+    [ "$answer" = "y" ] || [ "$answer" = "Y" ] || die "cancelled"
+}
+
+# ---- Service and health ------------------------------------------------------
+
+# fd 9 (the update lock) is closed for the service command: a server started
+# by a control script that forks it, instead of by systemd, would inherit the
+# lock and hold it for as long as it runs.
+service() { "$SERVICECTL" "$1" "$SERVICE" 9>&-; }
+
+health_base() {
+    if [ -n "${BR_HEALTH_BASE:-}" ]; then printf '%s' "$BR_HEALTH_BASE"; return; fi
+    local port; port="$(cfg http_port 80)"
+    if [ "$port" != "0" ]; then printf 'http://127.0.0.1:%s' "$port"
+    else printf 'https://127.0.0.1:%s' "$(cfg https_port 443)"; fi
+}
+
+# The site answers like a working one: the home page and the active theme's
+# stylesheet are served, and /login - which needs MongoDB - opens.
+health_check() {
+    local base theme deadline code_home code_login code_css
+    base="$(health_base)"
+    theme="$(cfg theme dark)"
+    deadline=$(( $(date +%s) + HEALTH_TIMEOUT ))
+    while :; do
+        code_home="$(curl -sk -A "$UA" -o /dev/null -w '%{http_code}' --max-time 5 "$base/" || true)"
+        code_login="$(curl -sk -A "$UA" -o /dev/null -w '%{http_code}' --max-time 5 "$base/login" || true)"
+        code_css="$(curl -sk -A "$UA" -o /dev/null -w '%{http_code}' --max-time 5 "$base/themes/$theme/styles_epoch3.css" || true)"
+        if [ "$code_home" = "200" ] && [ "$code_login" = "200" ] && [ "$code_css" = "200" ]; then
+            log "Healthy: / $code_home, /login $code_login, styles_epoch3.css $code_css"
+            return 0
+        fi
+        if [ "$(date +%s)" -ge "$deadline" ]; then
+            HEALTH_DETAIL="/ $code_home, /login $code_login, styles_epoch3.css $code_css"
+            warn "not healthy after ${HEALTH_TIMEOUT}s: $HEALTH_DETAIL"
+            return 1
+        fi
+        sleep 2
+    done
+}
+
+# ---- Database ----------------------------------------------------------------
+
+db_dump() {   # db_dump <dir>
+    [ "${BR_NO_DB_BACKUP:-0}" = "1" ] && { log "Database backup skipped (BR_NO_DB_BACKUP)."; return 0; }
+    command -v mongodump > /dev/null || die "mongodump not found - install the MongoDB tools, or set BR_NO_DB_BACKUP=1"
+    mongodump --quiet --uri "$(cfg mongodb_uri mongodb://localhost:27017)" \
+              --db "$(cfg mongodb_db boat_rudder)" --out "$1/mongodump"
+}
+
+db_restore() {   # db_restore <dir>
+    [ -d "$1/mongodump" ] || die "this backup has no database dump"
+    command -v mongorestore > /dev/null || die "mongorestore not found"
+    local db; db="$(cfg mongodb_db boat_rudder)"
+    mongorestore --quiet --drop --uri "$(cfg mongodb_uri mongodb://localhost:27017)" \
+                 --nsInclude "$db.*" "$1/mongodump"
+}
+
+# ---- Package: fetch, verify, extract, build ----------------------------------
+
+# Prints "<version> <tar url> <sig url>" for every release that has both the
+# source package and its signature, newest first; nothing when there are none.
+# Fails only when the API can't be read.
+latest_release() {
+    local json
+    json="$(curl -fsSL --proto '=https' -H "Accept: application/vnd.github+json" \
+                 "https://api.github.com/repos/$REPO/releases")" || return 1
+    { grep -oE '"browser_download_url": *"[^"]*boat-rudder-[0-9][0-9.]*-src\.tar\.gz(\.minisig)?"' <<< "$json" || true; } |
+        sed -E 's/^"browser_download_url": *"//; s/"$//' |
+        awk '{ v=$0; sub(/.*boat-rudder-/, "", v); sub(/-src\.tar\.gz(\.minisig)?$/, "", v);
+               if ($0 ~ /\.minisig$/) sig[v]=$0; else tar[v]=$0 }
+             END { for (v in tar) if (v in sig) print v, tar[v], sig[v] }' |
+        sort -t' ' -k1,1 -V -r
+}
+
+fetch_release() {   # fetch_release <version|latest> <dir>; sets PKG, SIG, SOURCE
+    local want="$1" dir="$2" line
+    line="$(latest_release | awk -v v="$want" 'v == "latest" ? NR == 1 : $1 == v')"
+    [ -n "$line" ] || die "no signed release '$want' found in github.com/$REPO"
+    local version tar_url sig_url
+    read -r version tar_url sig_url <<< "$line"
+    log "Downloading $version from github.com/$REPO ..."
+    PKG="$dir/boat-rudder-$version-src.tar.gz"; SIG="$PKG.minisig"
+    curl -fsSL --proto '=https' --max-filesize "$MAX_PACKAGE_BYTES" -o "$PKG" "$tar_url"
+    curl -fsSL --proto '=https' --max-filesize 65536 -o "$SIG" "$sig_url"
+    SOURCE="github:$REPO@$version"
+}
+
+verify_signature() {   # verify_signature <pkg> <sig>
+    [ -f "$STATE/minisign.pub" ] || die "no signing key installed ($STATE/minisign.pub) - can't verify anything"
+    command -v "$MINISIGN" > /dev/null || die "minisign not found - install it (apt install minisign)"
+    [ "$(stat -c %s "$1")" -le "$MAX_PACKAGE_BYTES" ] || die "package larger than $MAX_PACKAGE_BYTES bytes"
+    "$MINISIGN" -Vqm "$1" -x "$2" -p "$STATE/minisign.pub" || die "SIGNATURE CHECK FAILED - package rejected"
+    log "Signature verified."
+}
+
+# Extracts <pkg> into <dir>/src. Refuses anything but plain files and
+# directories under one top-level directory, absolute paths, "..", and more
+# than MAX_EXTRACTED_BYTES.
+extract_package() {   # extract_package <pkg> <dir>
+    local pkg="$1" dir="$2" top
+    local listing; listing="$(tar -tvzf "$pkg")" || die "not a readable .tar.gz"
+    awk '{ t = substr($1,1,1); if (t != "-" && t != "d") bad = 1 } END { exit bad }' <<< "$listing" ||
+        die "package contains links or special files - rejected"
+    local total; total="$(awk '{ s += $3 } END { print s + 0 }' <<< "$listing")"
+    [ "$total" -le "$MAX_EXTRACTED_BYTES" ] || die "package expands to more than $MAX_EXTRACTED_BYTES bytes - rejected"
+
+    local names; names="$(tar -tzf "$pkg")"
+    if grep -qE '(^/|(^|/)\.\.(/|$))' <<< "$names"; then die "package contains unsafe paths - rejected"; fi
+    top="${names%%$'\n'*}"; top="${top%%/*}"
+    [ -n "$top" ] || die "package must hold one top-level directory"
+    if awk -v t="$top" 'index($0, t "/") != 1 && $0 != t { bad = 1 } END { exit !bad }' <<< "$names"; then
+        die "package must hold one top-level directory"
+    fi
+
+    mkdir -p "$dir/extract"
+    tar -xzf "$pkg" -C "$dir/extract" --no-same-owner --no-same-permissions
+    mv "$dir/extract/$top" "$dir/src"
+    rmdir "$dir/extract"
+    [ -f "$dir/src/VERSION" ] && [ -f "$dir/src/CMakeLists.txt" ] && [ -x "$dir/src/scripts/manifest.sh" ] ||
+        die "not a Boat Rudder source package"
+}
+
+check_prerequisites() {   # check_prerequisites <src>
+    local missing="" tool
+    for tool in cmake cc make pkg-config strip; do command -v "$tool" > /dev/null || missing="$missing $tool"; done
+    for tool in libmongoc-1.0 libsodium openssl; do pkg-config --exists "$tool" 2>/dev/null || missing="$missing $tool(dev)"; done
+    [ -z "$missing" ] || die "missing build prerequisites:$missing"
+    for tool in magick jpegoptim gifsicle; do
+        command -v "$tool" > /dev/null || warn "'$tool' not found - media uploads will fail until it is installed"
+    done
+}
+
+build_package() {   # build_package <dir>
+    local dir="$1" version
+    version="$(head -n1 "$dir/src/VERSION")"
+    log "Building $version (log: $dir/build.log) ..."
+    if ! (cd "$dir/src" && ./scripts/compile_prod.sh) > "$dir/build.log" 2>&1; then
+        tail -n 25 "$dir/build.log" >&2
+        die "build failed - nothing was changed (full log: $dir/build.log)"
+    fi
+    [ "$("$dir/src/bin/boat-rudder" --version)" = "boat-rudder $version" ] ||
+        die "the new binary doesn't report version $version - nothing was changed"
+    log "Built: $("$dir/src/bin/boat-rudder" --version)"
+}
+
+# ---- Plan, backup, apply ------------------------------------------------------
+
+sha_of() { sha256sum -- "$1" | cut -d' ' -f1; }
+
+# Compares the installed manifest with the new one and the files on disk:
+# writes <dir>/plan/{replace,add,delete,edited,kept,unowned}, one path per
+# line: edited = edited on the host and replaced by the new version; kept =
+# edited on the host but unchanged in the new version, so left as edited.
+make_plan() {   # make_plan <dir>
+    local dir="$1" p h
+    declare -A old new
+    while read -r h p; do old["$p"]="$h"; done < "$STATE/manifest.sha256"
+    while read -r h p; do new["$p"]="$h"; done < "$dir/manifest.new"
+    mkdir -p "$dir/plan"
+    : > "$dir/plan/replace"; : > "$dir/plan/add"; : > "$dir/plan/delete"
+    : > "$dir/plan/edited";  : > "$dir/plan/kept"; : > "$dir/plan/unowned"
+    for p in "${!new[@]}"; do
+        if [ -n "${old[$p]+x}" ]; then
+            if [ -f "$INSTALL_DIR/$p" ]; then
+                local disk; disk="$(sha_of "$INSTALL_DIR/$p")"
+                [ "$disk" = "${new[$p]}" ] && continue
+                [ "${old[$p]}" = "${new[$p]}" ] && [ "$p" != "boat-rudder" ] && { echo "$p" >> "$dir/plan/kept"; continue; }
+                [ "$disk" != "${old[$p]}" ] && [ "$p" != "boat-rudder" ] && echo "$p" >> "$dir/plan/edited"
+                echo "$p" >> "$dir/plan/replace"
+            else
+                echo "$p" >> "$dir/plan/add"
+            fi
+        else
+            [ -e "$INSTALL_DIR/$p" ] && echo "$p" >> "$dir/plan/unowned"
+            echo "$p" >> "$dir/plan/add"
+        fi
+    done
+    for p in "${!old[@]}"; do
+        [ -z "${new[$p]+x}" ] && [ -e "$INSTALL_DIR/$p" ] && echo "$p" >> "$dir/plan/delete"
+    done
+    local f; for f in replace add delete edited kept unowned; do LC_ALL=C sort -o "$dir/plan/$f" "$dir/plan/$f"; done
+    return 0
+}
+
+show_plan() {   # show_plan <dir> <from> <to>
+    local dir="$1"
+    log "Update $2 -> $3: $(wc -l < "$dir/plan/replace") to replace, $(wc -l < "$dir/plan/add") to add, $(wc -l < "$dir/plan/delete") to delete."
+    if [ -s "$dir/plan/edited" ]; then
+        log ""
+        log "Edited on this host - the update replaces them, the backup keeps your copy:"
+        sed 's/^/  /' "$dir/plan/edited"
+    fi
+    if [ -s "$dir/plan/kept" ]; then
+        log ""
+        log "Edited on this host, unchanged in $3 - left as they are:"
+        sed 's/^/  /' "$dir/plan/kept"
+    fi
+    if [ -s "$dir/plan/unowned" ]; then
+        log ""
+        log "Not system files today, but the new version ships them - replaced, the backup keeps your copy:"
+        sed 's/^/  /' "$dir/plan/unowned"
+    fi
+    if [ -s "$dir/plan/delete" ]; then
+        log ""
+        log "No longer part of the system - deleted (kept in the backup):"
+        sed 's/^/  /' "$dir/plan/delete"
+    fi
+}
+
+# Everything a rollback needs, before anything is touched.
+make_backup() {   # make_backup <dir> <backup>
+    local dir="$1" bk="$2"
+    mkdir -p "$bk"
+    cp "$dir/plan/replace" "$dir/plan/delete" "$dir/plan/unowned" "$bk/"
+    LC_ALL=C comm -23 "$dir/plan/add" "$dir/plan/unowned" > "$bk/added"
+    cp "$STATE/manifest.sha256" "$bk/manifest.sha256"
+    cp "$STATE/VERSION" "$bk/VERSION" 2>/dev/null || echo "unknown" > "$bk/VERSION"
+    [ -f "$STATE/minisign.pub" ] && cp "$STATE/minisign.pub" "$bk/minisign.pub"
+    cat "$dir/plan/replace" "$dir/plan/delete" "$dir/plan/unowned" > "$bk/saved"
+    if [ -s "$bk/saved" ]; then
+        tar -czf "$bk/files.tar.gz" -C "$INSTALL_DIR" --verbatim-files-from -T "$bk/saved"
+    else
+        tar -czf "$bk/files.tar.gz" -T /dev/null   # nothing replaced or deleted
+    fi
+    db_dump "$bk"
+}
+
+file_mode() {   # file_mode <install path>
+    case "$1" in
+        boat-rudder|scripts/boat-rudder-update|*.sh) echo 755 ;;
+        *) echo 644 ;;
+    esac
+}
+
+# Every step returns on failure by hand: called inside a condition, bash
+# ignores `set -e` here, and a half-applied update must reach the rollback.
+apply_files() {   # apply_files <dir>
+    local dir="$1" p src dest
+    while IFS= read -r p; do
+        [ -n "$p" ] || continue
+        src="$dir/src/$p"; [ "$p" = "boat-rudder" ] && src="$dir/src/bin/boat-rudder"
+        dest="$INSTALL_DIR/$p"
+        mkdir -p "$(dirname "$dest")" || return 1
+        install -m "$(file_mode "$p")" "$src" "$dest.br-new" || return 1
+        mv -f "$dest.br-new" "$dest" || return 1
+    done < <(cat "$dir/plan/replace" "$dir/plan/add")
+    while IFS= read -r p; do
+        [ -z "$p" ] || rm -f "$INSTALL_DIR/$p" || return 1
+    done < "$dir/plan/delete"
+    install -m 644 "$dir/manifest.new" "$STATE/manifest.sha256" || return 1
+    install -m 644 "$dir/src/VERSION" "$STATE/VERSION" || return 1
+    if [ -f "$dir/src/scripts/minisign.pub" ]; then
+        install -m 644 "$dir/src/scripts/minisign.pub" "$STATE/minisign.pub" || return 1
+    fi
+    return 0
+}
+
+restore_backup() {   # restore_backup <backup> - files and state only, service stopped
+    local bk="$1" p
+    while IFS= read -r p; do [ -n "$p" ] && rm -f "$INSTALL_DIR/$p"; done < "$bk/added"
+    tar -xzf "$bk/files.tar.gz" -C "$INSTALL_DIR"
+    install -m 644 "$bk/manifest.sha256" "$STATE/manifest.sha256"
+    install -m 644 "$bk/VERSION" "$STATE/VERSION"
+    if [ -f "$bk/minisign.pub" ]; then install -m 644 "$bk/minisign.pub" "$STATE/minisign.pub"; fi
+}
+
+prune_backups() {
+    local old
+    old="$(ls -1d "$STATE"/backups/*/ 2>/dev/null | LC_ALL=C sort | head -n -"$KEEP_BACKUPS")" || true
+    [ -n "$old" ] && printf '%s\n' "$old" | while IFS= read -r d; do rm -rf "$d"; done
+    return 0
+}
+
+# ---- Commands ----------------------------------------------------------------
+
+cmd_status() {
+    [ -d "$STATE" ] || die "no Boat Rudder install with update state at $INSTALL_DIR"
+    log "Installed: $(installed_version) ($INSTALL_DIR)"
+    log "Binary:    $("$INSTALL_DIR/boat-rudder" --version 2>/dev/null || echo '?')"
+    log "Service:   $(service is-active 2>/dev/null || true)"
+    log "Signing key: $([ -f "$STATE/minisign.pub" ] && echo installed || echo 'MISSING - updates refused')"
+    if [ -f "$STATE/manifest.sha256" ] && [ -x "$INSTALL_DIR/scripts/manifest.sh" ]; then
+        "$INSTALL_DIR/scripts/manifest.sh" verify "$INSTALL_DIR" | sed 's/^/  /' || true
+    fi
+    if [ -s "$STATE/history.jsonl" ]; then log "Last: $(tail -n1 "$STATE/history.jsonl")"; fi
+}
+
+cmd_check() {
+    local current releases newer
+    current="$(installed_version)"
+    releases="$(latest_release)" || die "can't reach the GitHub API"
+    [ -n "$releases" ] || { log "No signed releases in github.com/$REPO yet."; return 0; }
+    newer=""
+    local v
+    while read -r v _; do
+        [ "$v" != "$current" ] && [ "$(printf '%s\n%s\n' "$current" "$v" | sort -V | tail -n1)" = "$v" ] &&
+            newer="$newer $v"
+    done <<< "$releases"
+    log "Installed: $current"
+    if [ -n "$newer" ]; then log "Available:$newer"; else log "Up to date (latest: $(awk 'NR == 1 { print $1 }' <<< "$releases"))."; fi
+}
+
+cmd_install() {
+    local want="" file="" sig=""
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --file) file="${2:-}"; shift 2 ;;
+            --sig) sig="${2:-}"; shift 2 ;;
+            --yes) YES=1; shift ;;
+            --force) FORCE=1; shift ;;
+            -*) usage ;;
+            *) want="$1"; shift ;;
+        esac
+    done
+    [ -n "$want" ] || [ -n "$file" ] || usage
+    require_root; require_install; lock
+
+    # One update at a time (the lock): whatever an earlier, failed run left in
+    # staging - its package, its build, its log - goes now.
+    rm -rf "$STATE/staging"
+
+    local from dir
+    from="$(installed_version)"
+    dir="$STATE/staging/$(date -u +%Y%m%d-%H%M%S)"
+    mkdir -p "$dir"
+    STAGING="$dir"   # global: the EXIT trap runs after this function returns
+    trap 'rm -rf "$STAGING/extract"' EXIT
+
+    step "Package"
+    if [ -n "$file" ]; then
+        [ -f "$file" ] && [ -f "$sig" ] || die "--file needs an existing package and --sig its .minisig"
+        PKG="$dir/$(basename "$file")"; SIG="$PKG.minisig"
+        cp "$file" "$PKG"; cp "$sig" "$SIG"
+        SOURCE="file:$(basename "$file")"
+    else
+        fetch_release "$want" "$dir"
+    fi
+    verify_signature "$PKG" "$SIG"
+    extract_package "$PKG" "$dir"
+
+    local to; to="$(head -n1 "$dir/src/VERSION")"
+    if [ "$FORCE" != "1" ]; then
+        [ "$to" != "$from" ] || die "$to is already installed (--force to reinstall)"
+        [ "$(printf '%s\n%s\n' "$from" "$to" | sort -V | tail -n1)" = "$to" ] ||
+            die "$to is older than the installed $from (--force to install it anyway; 'rollback' undoes an update)"
+    fi
+
+    step "Build"
+    check_prerequisites "$dir/src"
+    build_package "$dir"
+    "$dir/src/scripts/manifest.sh" create "$dir/src" > "$dir/manifest.new"
+
+    step "Plan"
+    make_plan "$dir"
+    show_plan "$dir" "$from" "$to"
+    confirm "Apply the update to $to?"
+
+    step "Backup"
+    local name bk
+    name="$(date -u +%Y%m%d-%H%M%S)-$from-to-$to"
+    bk="$STATE/backups/$name"
+    make_backup "$dir" "$bk"
+    log "Backup: $bk"
+
+    step "Apply"
+    service stop || true
+    if apply_files "$dir" && service start && health_check; then
+        record install "$from" "$to" "$SOURCE" ok "$name" ""
+        rm -rf "$dir"
+        prune_backups
+        log ""
+        log "Updated to $to."
+        return 0
+    fi
+
+    step "Rolling back - the update didn't come up healthy"
+    service stop || true
+    restore_backup "$bk"
+    touch "$bk/rolled-back"
+    service start || true
+    if health_check; then
+        record install "$from" "$to" "$SOURCE" rolled-back "$name" "${HEALTH_DETAIL:-apply failed}"
+        die "update to $to failed and was rolled back to $from (staging kept: $dir)"
+    fi
+    record install "$from" "$to" "$SOURCE" rollback-unhealthy "$name" "${HEALTH_DETAIL:-}"
+    die "update to $to failed, and $from isn't healthy after the rollback either - check 'journalctl -u $SERVICE' and /var/log/boat-rudder.log"
+}
+
+cmd_rollback() {
+    local restore_db=0
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --restore-db) restore_db=1; shift ;;
+            --yes) YES=1; shift ;;
+            *) usage ;;
+        esac
+    done
+    require_root; require_install; lock
+
+    local bk="" d
+    local -a backups=()
+    mapfile -t backups < <(ls -1d "$STATE"/backups/*/ 2>/dev/null | LC_ALL=C sort -r)
+    for d in "${backups[@]}"; do
+        [ -e "$d/rolled-back" ] || { bk="${d%/}"; break; }
+    done
+    [ -n "$bk" ] || die "no update to roll back"
+    local from to name
+    name="$(basename "$bk")"; from="$(installed_version)"; to="$(head -n1 "$bk/VERSION")"
+    log "Roll back $from -> $to (backup $name)$([ "$restore_db" = 1 ] && echo ', restoring the database')."
+    confirm "Roll back?"
+
+    service stop || true
+    restore_backup "$bk"
+    [ "$restore_db" = "1" ] && db_restore "$bk"
+    touch "$bk/rolled-back"
+    service start || true
+    if health_check; then
+        record rollback "$from" "$to" "backup:$name" ok "$name" "$([ "$restore_db" = 1 ] && echo 'database restored')"
+        log "Rolled back to $to."
+    else
+        record rollback "$from" "$to" "backup:$name" unhealthy "$name" "${HEALTH_DETAIL:-}"
+        die "rolled back to $to, but the site isn't healthy - check /var/log/boat-rudder.log"
+    fi
+}
+
+cmd_history() {
+    [ -s "$STATE/history.jsonl" ] || { log "No updates yet."; return 0; }
+    cat "$STATE/history.jsonl"
+}
+
+YES=0
+STAGING=""
+FORCE=0
+case "${1:-}" in
+    status)   shift; cmd_status ;;
+    check)    shift; cmd_check ;;
+    install)  shift; cmd_install "$@" ;;
+    rollback) shift; cmd_rollback "$@" ;;
+    history)  shift; cmd_history ;;
+    *)        usage ;;
+esac

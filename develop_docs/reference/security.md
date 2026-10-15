@@ -168,6 +168,26 @@ rotations.
 
 ---
 
+## Updates
+
+Updating a site means compiling and running new code as root, so the updater
+([scripts.md](scripts.md#scriptsboat-rudder-update)) trusts only the maintainer's signature:
+
+- Every package must carry a minisign signature that verifies against the key **already
+  installed** in `.boat-rudder/minisign.pub` - never a key shipped inside the package. Downloads
+  come over HTTPS from GitHub, but the signature, not the transport, is what's trusted. A package
+  may replace the key only by being signed with the current one.
+- The secret key lives on the maintainer's machine, password-protected - not in the repository,
+  on GitHub or on any server ([`scripts/release.sh`](scripts.md#scriptsreleasesh)).
+- Extraction refuses anything but regular files and directories (symlinks, hard links, devices),
+  absolute paths, `..`, more than one top directory and archives over 1 GB; files are extracted
+  without their archived owners.
+- Only paths in the installed or the new manifest are written or deleted; `html/content/`,
+  `configs/`, `ssl/`, `data/` and anything else on the host are out of reach.
+- Every install and rollback is recorded in `.boat-rudder/history.jsonl`.
+
+---
+
 ## Known gaps
 
 Observed in the code as of this revision; listed so they are visible, not because they are

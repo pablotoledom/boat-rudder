@@ -26,6 +26,25 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *A
   and installs `scripts/manifest.sh`. Groundwork for updates with rollback
   ([update-system-plan.md](develop_docs/plans/update-system-plan.md)).
 
+### Update system, phases 2 and 3: signed releases and the updater
+
+**Added**
+- `scripts/release.sh <version>` (maintainer): packages `HEAD` with `git archive` as
+  `dist/boat-rudder-<version>-src.tar.gz`, signs it with minisign, verifies the signature against
+  `scripts/minisign.pub`, tags `v<version>` and, with `--publish`, creates the GitHub release with
+  both files and the version's changelog section.
+- `scripts/boat-rudder-update`, installed as `/usr/local/sbin/boat-rudder-update`: `status`,
+  `check`, `install <version>|latest` or `install --file … --sig …`, `rollback [--restore-db]`,
+  `history`. Verifies the signature against the installed key, extracts safely, compiles on the
+  host, shows the files to replace/add/delete (and which were edited on the host), backs up those
+  files and the database, applies, health-checks `/`, `/login` and the theme stylesheet, and rolls
+  back by itself when the check fails. Only files in the installed or new manifest are touched.
+- `install.sh` installs the updater and `.boat-rudder/minisign.pub`.
+
+**Changed**
+- `install.sh` copies the repository's `html/content/` (sample content) only on the first install;
+  a reinstall no longer overwrites a live site's uploads with same-named samples.
+
 ### Media uploads on an installed server
 
 **Fixed**

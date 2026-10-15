@@ -196,21 +196,26 @@ Compiles the project for production and installs it as a **systemd service**.
      every media upload; without it every upload fails with `415`. The installer also warns when
      one of its tools - `magick`, `jpegoptim`, `gifsicle` - is missing, which fails the same way.
    - `scripts/manifest.sh` - to check the install against its manifest on the host (below).
+   - `scripts/boat-rudder-update` - the updater ([below](#scriptsboat-rudder-update)), also
+     linked as `/usr/local/sbin/boat-rudder-update`.
    - `configs/settings.conf` - **only on the first install.** It is per-host (ports, WAP gateway
      addresses, log level…), so a reinstall keeps the installed file, writes the repository's
      version next to it as `settings.conf.dist`, and lists every key the installed file lacks
      (those run with their built-in defaults - see [configuration.md](configuration.md)).
-   - `html/` - merged over the installed copy with `cp -rT`: templates and themes are updated,
-     files that only exist on the server (media uploaded from the dashboard under
-     `html/content/`) are kept. Creates an empty one with a warning if absent.
+   - `html/` - everything but `html/content/` is merged over the installed copy with `cp -rT`:
+     templates, themes and assets are updated, files that only exist on the server (uploaded
+     fonts...) are kept. `html/content/` is the site's own and the repository's copy only sample
+     content, so it is **seeded on the first install only** - copied over a live site it would
+     replace same-named files with the samples. Creates an empty `html/` with a warning if absent.
    - `data/GeoLite2-Country.mmdb` - copied to `data/` if present; otherwise a warning that every
      visitor country will be "Unknown" ([analytics.md](analytics.md#geoip-optional)).
    - `ssl/` - **only seeded on the first install** (when the installed `ssl/` is empty), so
      certificates renewed in place on the server are never overwritten by a stale checkout.
    - `.boat-rudder/` - written last, once every file is in place: `VERSION` and
      `manifest.sha256`, the manifest of the system files just installed
-     ([`scripts/manifest.sh`](#scriptsmanifestsh)). The updater compares against it, and it is the
-     only list of files an update may replace or delete.
+     ([`scripts/manifest.sh`](#scriptsmanifestsh)), and `minisign.pub`, the key releases must be
+     signed with. The updater compares against the manifest, and it is the only list of files an
+     update may replace or delete.
 
    This is the one place where the content tree really is copied: the installed service runs
    from `/usr/local/bin/boat-rudder/`, independent of the source checkout.
@@ -409,6 +414,9 @@ These scripts are not meant to be called directly but can be if needed. All of t
 | `scripts/uninstall.sh` | `uninstall` | `sudo ./scripts/uninstall.sh` |
 | `scripts/image-optimizer.sh` | the server, via `popen()` on every media upload | `./scripts/image-optimizer.sh <in_dir> <out_dir> [file]` |
 | `scripts/manifest.sh` | `install` (`create`); manual on a host (`adopt`, `verify`) | `./scripts/manifest.sh create\|adopt\|verify …` |
+| `scripts/boat-rudder-update` | nothing (manual, on an installed host) | `sudo boat-rudder-update status\|check\|install\|rollback\|history` |
+| `scripts/release.sh` | nothing (manual, by the maintainer) | `./scripts/release.sh <version> [--key <file>] [--publish]` |
+| `scripts/minisign.pub` | copied by `install` to `.boat-rudder/` | not executable - the public key releases are signed with |
 | `scripts/mongodb_start.sh` | nothing (manual) | `./scripts/mongodb_start.sh` |
 | `scripts/mongodb_dump.sh` | nothing (manual) | `./scripts/mongodb_dump.sh` |
 | `scripts/mongodb_restore.sh` | nothing (manual) | `./scripts/mongodb_restore.sh` |
@@ -426,8 +434,8 @@ or one of them is missing, no variant is written and the server rejects the uplo
 
 ### `scripts/manifest.sh`
 
-The list of a version's **system files** - the binary, `scripts/image-optimizer.sh` and
-`scripts/manifest.sh`, the two default favicons, and every file under `html/templates/`,
+The list of a version's **system files** - the binary, `scripts/image-optimizer.sh`,
+`scripts/manifest.sh` and `scripts/boat-rudder-update`, the two default favicons, and every file under `html/templates/`,
 `html/themes/` and `html/assets/` - each with its SHA-256, in `sha256sum` format with paths
 relative to the install directory (`.boat-rudder/manifest.sha256`). `html/content/`, `configs/`,
 `ssl/`, `data/`, the uploaded favicons and fonts are the site's and never listed. Part of the
@@ -445,6 +453,83 @@ Adopting the production install, from the checkout of the version it runs:
 cd /usr/local/src/<checkout>
 sudo ./scripts/manifest.sh adopt /usr/local/bin/boat-rudder
 ```
+
+### `scripts/release.sh`
+
+Run by the maintainer, on their own machine, to publish version `<version>`
+([update-system-plan.md](../plans/update-system-plan.md) §3):
+
+1. Checks: `minisign` installed, the secret key exists (default `~/.minisign/boat-rudder.key`,
+   `--key` for another), `scripts/minisign.pub` exists, `VERSION` says `<version>`, the work tree
+   is clean, the tag `v<version>` doesn't exist. Warns when `CHANGELOG.md` has no `## v<version>`.
+2. `git archive` of `HEAD` under `boat-rudder-<version>/`, `gzip -n` →
+   `dist/boat-rudder-<version>-src.tar.gz`. Only versioned files; the same commit always gives the
+   same bytes. (GitHub's automatic "Source code" archives can't be signed: their bytes aren't
+   guaranteed stable.)
+3. Signs it (`.minisig`, asks for the key's password) and verifies the signature against
+   `scripts/minisign.pub` - a package the installs would reject stops here.
+4. Tags `HEAD` as `v<version>` (annotated) - only now, so a failed signature leaves no tag.
+5. Writes the release notes - the version's `CHANGELOG.md` section - to
+   `dist/boat-rudder-<version>-notes.md`. With `--publish` (needs the `gh` CLI, logged in), pushes
+   the tag and creates the GitHub release with the package and its signature; without it, prints
+   the steps to do the same on github.com. A release the updater can see has **both** files.
+
+`dist/` is gitignored. The key pair is made once:
+
+```bash
+minisign -G -p scripts/minisign.pub -s ~/.minisign/boat-rudder.key
+```
+
+`scripts/minisign.pub` is committed; the secret key never enters the repository - keep it, and a
+backup, off the servers.
+
+### `scripts/boat-rudder-update`
+
+The updater ([update-system-plan.md](../plans/update-system-plan.md) §4-§6). Runs as root on an
+installed host, from `/usr/local/sbin/boat-rudder-update` (the link `install.sh` makes). Works on
+`/usr/local/bin/boat-rudder/` and its `.boat-rudder/` state directory; one run at a time (`flock`
+on `.boat-rudder/update.lock`).
+
+| Command | Does |
+|---|---|
+| `status` | Installed version, binary `--version`, service state, whether the signing key is installed, system files modified or missing (`manifest.sh verify`), the last update |
+| `check` | The releases on `github.com/jpablotoledom/boat-rudder` that have both `-src.tar.gz` and `.minisig` and are newer than the installed version |
+| `install <version>\|latest [--yes] [--force]` | Downloads that release and runs the stages below. `--force` reinstalls the installed version |
+| `install --file <pkg.tar.gz> --sig <pkg.minisig>` | The same from a package already on the host |
+| `rollback [--restore-db] [--yes]` | Undoes the newest update not already rolled back, from its backup |
+| `history` | Every install and rollback, from `.boat-rudder/history.jsonl` |
+
+Stages of `install` - everything that can fail runs before the site is touched:
+
+1. **Package**: the signature is checked against `.boat-rudder/minisign.pub` (never against a key
+   inside the package); the archive is extracted to `.boat-rudder/staging/`, refusing anything but
+   regular files and directories, absolute paths, `..`, more than one top directory and archives
+   over 1 GB.
+2. **Build**: prerequisites (`cmake`, `cc`, `make`, `pkg-config`, `strip`, the `libmongoc`,
+   `libsodium` and `openssl` headers - missing ones stop the update; a missing `magick`,
+   `jpegoptim` or `gifsicle` only warns), then
+   `scripts/compile_prod.sh` in the staging copy; the new binary must answer `--version` with the
+   package's `VERSION`. A failed build stops here, with the log; the service is never stopped.
+3. **Plan**: the installed manifest against the new one gives the files to replace, add and
+   delete. A system file whose content differs from the installed manifest was edited on the host:
+   listed, replaced, kept in the backup. Files outside both manifests are never touched. Asks to
+   continue (unless `--yes`).
+4. **Backup** to `.boat-rudder/backups/<date>-<from>-to-<to>/`: the files to replace or delete,
+   the list of files to add, the old manifest, `VERSION` and key, and a `mongodump` of the site
+   database (skipped with `BR_NO_DB_BACKUP=1`). The last 5 backups are kept.
+5. **Apply**: stops the service, writes each file to a temporary name and renames it into place,
+   deletes the removed ones, writes the new `manifest.sha256`, `VERSION` and key, starts the
+   service.
+6. **Health check** (30 s): `/`, `/login` and the active theme's `styles_epoch3.css` must answer
+   `200`. If not, the update is **rolled back automatically** and recorded as failed.
+
+`rollback` restores the backup's files, deletes the ones the update added, restores manifest,
+`VERSION` and key, restarts and checks health. The database is restored only with
+`--restore-db` - by default, entries written since the update are kept.
+
+Environment overrides, for testing: `BR_INSTALL_DIR`, `BR_REPO`, `BR_SERVICE`, `BR_SERVICECTL`,
+`BR_MINISIGN`, `BR_HEALTH_BASE`, `BR_HEALTH_TIMEOUT`, `BR_KEEP_BACKUPS`, `BR_NO_DB_BACKUP`,
+`BR_ALLOW_NONROOT`.
 
 ### MongoDB helpers
 
