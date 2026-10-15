@@ -1,1 +1,1 @@
-{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"}],"uuid":"d2f13114d5c34ea2ade5e80ba569be06","collectionName":"fonts","type":"collection"}
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"}],"uuid":"e595fedf35484e61b6fa50be8996e397","collectionName":"fonts","type":"collection"}
