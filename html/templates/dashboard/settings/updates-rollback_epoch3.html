@@ -1,0 +1,14 @@
+  <section class="boat-rudder-dashboard__panel">
+    <h2>Roll back</h2>
+    <div class="boat-rudder-card boat-rudder-updates__rollback">
+      <p>The update from %2$s to %1$s (%3$s) can be undone: the files it replaced come back and
+         %2$s runs again. Entries, media and settings saved since then are kept.</p>
+      <form method="POST" action="/dashboard/settings/updates/rollback" class="boat-rudder-updates__apply">
+        <label class="boat-rudder-updates__password">Your password
+          <input class="boat-rudder-input boat-rudder-input--sm" type="password" name="password"
+                 autocomplete="current-password" required>
+        </label>
+        <button class="boat-rudder-btn boat-rudder-btn--danger" type="submit">Roll back to %2$s</button>
+      </form>
+    </div>
+  </section>

@@ -1,16 +1,87 @@
 # Changelog
 
-All notable changes to Boat Rudder. Dates are commit dates; commit hashes are given for
-reference. The project has no tagged releases yet - everything below is the work leading up to
-**v0.0.1** (the current branch).
+All notable changes to Boat Rudder, newest first. Each `## vX.Y.Z` section is one release:
+`scripts/release.sh` publishes it as that release's notes on GitHub, and the dashboard's
+Updates page shows them. Changes not released yet go under `## Unreleased` until the next
+release renames it. Dates are commit dates; older entries give commit hashes for reference.
 
 Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *Added*,
 *Changed*, *Fixed*, *Removed*, *Security*, *Docs*.
 
 ---
 
-## v0.0.1
+## v0.0.5
+### 2026-10-15
 
+### Update system, phase 4: updates from the dashboard
+
+**Added**
+- `/dashboard/settings/updates` (admin): the installed version, whether a newer signed release
+  exists, and every release's notes, newest first, marked *Installed*, *New*, *Pre-release* or
+  *No signed package*. The list comes from the GitHub API (through `curl`), is kept for an hour,
+  and *Check now* fetches it again.
+- *Update to X* and *Roll back to X* on that page, each asking for the admin's password again.
+  The server starts `boat-rudder-update run-request` as a transient systemd unit (`systemd-run`)
+  and the page follows it live - stages, message, log - across the restart, then shows the
+  result. Same safeguards as the console: signature, build before touching the site, backup,
+  health check, automatic rollback.
+- `boat-rudder-update run-request`, `.boat-rudder/progress.json` and `last-run.log`; `history`
+  records who ran each update (`by`).
+- Site settings shows the running version under its title, with a link to *Updates*, and an
+  *Updates* card under *More settings*.
+- `update_repo` in `settings.conf`: the GitHub repository of the releases, for the page and for
+  `boat-rudder-update` (default `jpablotoledom/boat-rudder`).
+- `src/utils/markdown_lite.c`: the Markdown subset of `CHANGELOG.md` to escaped HTML, for the
+  release notes.
+
+
+## v0.0.4
+### 2026-10-14
+
+### Update system, phase 1: versions and manifests
+
+**Added**
+- `VERSION` at the root of the source; `boat-rudder --version` prints it, and the startup log line
+  names it.
+- `scripts/manifest.sh`: the manifest of a version's system files (binary, `scripts/`,
+  `html/templates`, `html/themes`, `html/assets`, the default favicons) with their SHA-256, in
+  `sha256sum` format - `create` from a built source tree, `adopt` for an existing install (reports
+  files edited on the host, missing, or not part of the version), `verify` an install against it.
+  Never lists `html/content/`, `configs/`, `ssl/`, `data/` or the uploaded favicons and fonts.
+- `install.sh` writes `.boat-rudder/VERSION` and `.boat-rudder/manifest.sha256` into the install,
+  and installs `scripts/manifest.sh`. Groundwork for updates with rollback
+  ([update-system-plan.md](develop_docs/plans/update-system-plan.md)).
+
+### Update system, phases 2 and 3: signed releases and the updater
+
+**Added**
+- `scripts/release.sh <version>` (maintainer): packages `HEAD` with `git archive` as
+  `dist/boat-rudder-<version>-src.tar.gz`, signs it with minisign, verifies the signature against
+  `scripts/minisign.pub`, tags `v<version>` and, with `--publish`, creates the GitHub release with
+  both files and the version's changelog section.
+- `scripts/boat-rudder-update`, installed as `/usr/local/sbin/boat-rudder-update`: `status`,
+  `check`, `install <version>|latest` or `install --file … --sig …`, `rollback [--restore-db]`,
+  `history`. Verifies the signature against the installed key, extracts safely, compiles on the
+  host, shows the files to replace/add/delete (and which were edited on the host), backs up those
+  files and the database, applies, health-checks `/`, `/login` and the theme stylesheet, and rolls
+  back by itself when the check fails. Only files in the installed or new manifest are touched.
+- `install.sh` installs the updater and `.boat-rudder/minisign.pub`.
+
+**Changed**
+- `install.sh` copies the repository's `html/content/` (sample content) only on the first install;
+  a reinstall no longer overwrites a live site's uploads with same-named samples.
+
+### Media uploads on an installed server
+
+**Fixed**
+- `install.sh` didn't copy `scripts/image-optimizer.sh`, which the server runs on every media
+  upload, so on an installed server every upload failed with `415`. It is installed now, and the
+  installer warns when `magick`, `jpegoptim` or `gifsicle` is missing.
+- A media upload rejected for its type is logged with its name and first bytes, which tells a
+  mislabeled file (a WebP, AVIF or HEIC saved as `.jpg`) from a real problem.
+
+
+## v0.0.3
 ### 2026-10-14
 ### Gallery block editing
 
@@ -45,6 +116,7 @@ Format inspired by [Keep a Changelog](https://keepachangelog.com/). Sections: *A
   `_half` variant (written through its base-name symlink) and added a second media record for
   the same files, so deleting either removed both pictures.
 
+## v0.0.2
 ### 2026-10-11
 ### Browser detection from the dashboard
 

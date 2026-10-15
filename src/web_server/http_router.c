@@ -40,6 +40,7 @@
 #include "../modules/menu_admin/menu_admin.h"
 #include "../modules/site_settings_admin/site_settings_admin.h"
 #include "../modules/browser_detection_admin/browser_detection_admin.h"
+#include "../modules/updates_admin/updates_admin.h"
 #include "../db/cms_browser_detection.h"
 #include "../modules/users_admin/users_admin.h"
 #include "../db/cms_media.h"
@@ -67,6 +68,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <errno.h>
+#include <sodium.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -710,6 +712,23 @@ static int require_admin_session(void *ctx, HttpRequest *req, int epoch, char *u
     }
 
     return 1;
+}
+
+// The signed-in user's password, typed again (the `password` form field) -
+// for actions that run code as root, so an open session alone isn't enough.
+// On success copies the user's email into email_out and returns 1.
+static int confirm_password(const HttpRequest *req, const char *user_id, char *email_out, size_t email_size) {
+    char password[256] = "";
+    char role[USER_ROLE_BUF_SIZE];
+    parse_urlencoded_field(req->body, req->body_length, "password", password, sizeof(password));
+    if (!password[0] || cms_get_user_values(user_id, email_out, email_size, role, sizeof(role)) != 0) return 0;
+
+    char *id = auth_login_user(email_out, password);
+    int ok = id && strcmp(id, user_id) == 0;
+    free(id);
+    sodium_memzero(password, sizeof(password));
+    if (!ok) LOG_WARN("updates: wrong password confirming an update action (%s)", email_out);
+    return ok;
 }
 
 // 1 if `role` is "admin", or `role` is "author" and `entry` is a "blog" entry
@@ -1876,6 +1895,40 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                         char *response = body ? build_epoch_response(body, "", epoch) : NULL;
                         free(body);
                         send_or_error(ctx, response, req.method, epoch);
+                    }
+                }
+
+            } else if (strcmp(decoded_url, "/dashboard/settings/updates") == 0) {
+                int epoch = resolve_epoch(&req);
+
+                if (!dashboard_allowed(&req, epoch)) {
+                    char *response = build_redirect_response("/dashboard", "", epoch);
+                    send_or_error(ctx, response, req.method, epoch);
+                } else {
+                    char user_id[USER_ID_HEX_BUF_SIZE];
+                    if (require_admin_session(ctx, &req, epoch, user_id)) {
+                        const char *error = get_query_param(params, param_count, "error");
+                        char *content  = updates_admin_page(epoch, error);
+                        char *body     = content ? buildPageWebSite(epoch, "{{SITE_NAME}} - Updates", content) : NULL;
+                        char *response = body ? build_epoch_response(body, "", epoch) : NULL;
+                        free(body);
+                        send_or_error(ctx, response, req.method, epoch);
+                    }
+                }
+
+            } else if (strcmp(decoded_url, "/dashboard/api/updates/progress") == 0) {
+                int epoch = resolve_epoch(&req);
+                if (!dashboard_allowed(&req, epoch)) {
+                    send_simple(ctx, "403 Forbidden", "Forbidden");
+                } else {
+                    char user_id[USER_ID_HEX_BUF_SIZE];
+                    if (require_admin_session(ctx, &req, epoch, user_id)) {
+                        char *json = updates_admin_progress_json();
+                        char *response = build_json_response(json ? json : "{\"state\":\"none\"}");
+                        free(json);
+                        connection_write(ctx, response, strlen(response));
+                        free(response);
+                        connection_close(ctx);
                     }
                 }
 
@@ -4423,6 +4476,17 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                         if (!file_part || file_part->filename[0] == '\0') {
                             send_simple(ctx, "400 Bad Request", "Missing file");
                         } else if (!image_ext) {
+                            // Not a JPEG, PNG, GIF or WebP, whatever its name says:
+                            // its first bytes show what it is (AVIF, HEIC, ...).
+                            const unsigned char *d = (const unsigned char *)file_part->data;
+                            size_t n = file_part->data_len;
+                            LOG_WARN("media upload rejected: '%s' (%zu bytes, starts "
+                                     "%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x)",
+                                     file_part->filename, n,
+                                     n > 0 ? d[0] : 0, n > 1 ? d[1] : 0, n > 2 ? d[2] : 0,
+                                     n > 3 ? d[3] : 0, n > 4 ? d[4] : 0, n > 5 ? d[5] : 0,
+                                     n > 6 ? d[6] : 0, n > 7 ? d[7] : 0, n > 8 ? d[8] : 0,
+                                     n > 9 ? d[9] : 0, n > 10 ? d[10] : 0, n > 11 ? d[11] : 0);
                             send_simple(ctx, "415 Unsupported Media Type",
                                         "Only JPEG, PNG, GIF and WebP images can be uploaded");
                         } else if (!media_name_with_extension(sanitized, sizeof(sanitized), image_ext) ||
@@ -4580,6 +4644,48 @@ void http_route(read_func_t read_func, void *ctx, const char *root_directory) {
                     cms_browser_detection_reset();
                     cms_browser_detection_reload();
                     char *response = build_redirect_response("/dashboard/settings/browsers", "", epoch);
+                    send_or_error(ctx, response, req.method, epoch);
+                }
+            }
+
+        } else if (strcmp(req.method, "POST") == 0 &&
+                   strcmp(decoded_url, "/dashboard/settings/updates/check") == 0) {
+            int epoch = resolve_epoch(&req);
+            if (!dashboard_allowed(&req, epoch)) {
+                char *response = build_redirect_response("/dashboard", "", epoch);
+                send_or_error(ctx, response, req.method, epoch);
+            } else {
+                char user_id[USER_ID_HEX_BUF_SIZE];
+                if (require_admin_session(ctx, &req, epoch, user_id)) {
+                    updates_admin_check_now();
+                    char *response = build_redirect_response("/dashboard/settings/updates", "", epoch);
+                    send_or_error(ctx, response, req.method, epoch);
+                }
+            }
+
+        } else if (strcmp(req.method, "POST") == 0 &&
+                   (strcmp(decoded_url, "/dashboard/settings/updates/install") == 0 ||
+                    strcmp(decoded_url, "/dashboard/settings/updates/rollback") == 0)) {
+            int epoch = resolve_epoch(&req);
+            if (!dashboard_allowed(&req, epoch)) {
+                char *response = build_redirect_response("/dashboard", "", epoch);
+                send_or_error(ctx, response, req.method, epoch);
+            } else {
+                char user_id[USER_ID_HEX_BUF_SIZE];
+                if (require_admin_session(ctx, &req, epoch, user_id)) {
+                    int install = strstr(decoded_url, "/install") != NULL;
+                    char email[256] = "";
+                    char version[64] = "";
+                    const char *error = "password";
+                    if (confirm_password(&req, user_id, email, sizeof(email))) {
+                        parse_urlencoded_field(req.body, req.body_length, "version", version, sizeof(version));
+                        error = updates_admin_request(install ? "install" : "rollback",
+                                                      install ? version : NULL, email);
+                    }
+                    char location[96];
+                    snprintf(location, sizeof(location), "/dashboard/settings/updates%s%s",
+                             error ? "?error=" : "", error ? error : "");
+                    char *response = build_redirect_response(location, "", epoch);
                     send_or_error(ctx, response, req.method, epoch);
                 }
             }

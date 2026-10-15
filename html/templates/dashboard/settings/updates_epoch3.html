@@ -1,0 +1,33 @@
+<section class="boat-rudder-dashboard boat-rudder-updates">
+  <nav class="boat-rudder-dashboard__breadcrumb" aria-label="Breadcrumb">
+    <ol><li><a href="/dashboard">Dashboard</a></li><li><a href="/dashboard/settings">Site settings</a></li></ol>
+  </nav>
+  <h1>Updates</h1>
+%6$s
+
+  <section class="boat-rudder-dashboard__panel">
+    <div class="boat-rudder-card boat-rudder-updates__summary">
+      <div class="boat-rudder-updates__installed">
+        <span class="boat-rudder-caption">Installed version</span>
+        <strong class="boat-rudder-updates__version">%1$s</strong>
+      </div>
+%2$s
+      <form method="POST" action="/dashboard/settings/updates/check" class="boat-rudder-updates__check">
+        <button class="boat-rudder-btn" type="submit">Check now</button>
+        <span class="boat-rudder-dashboard__hint">%3$s</span>
+      </form>
+    </div>
+  </section>
+%7$s%8$s
+  <section class="boat-rudder-dashboard__panel">
+    <h2>Changelog</h2>
+    <p class="boat-rudder-dashboard__hint boat-rudder-updates__intro">Releases of
+       <a href="https://github.com/%4$s/releases" rel="noopener noreferrer">github.com/%4$s</a>,
+       newest first. Only those with a signed source package can be installed.</p>
+    <div class="boat-rudder-updates__releases">
+%5$s
+    </div>
+  </section>
+</section>
+
+<script src="/assets/js/updates.js" defer></script>

@@ -66,6 +66,7 @@ set(SOURCES
     src/utils/http_utils.c
     src/utils/detect_epoch.c
     src/utils/css_compat.c
+    src/utils/markdown_lite.c
     src/utils/read_file.c
     src/utils/generate_url_theme.c
     src/utils/template_utils.c
@@ -108,6 +109,7 @@ set(SOURCES
     src/modules/media_admin/media_admin.c
     src/modules/site_settings_admin/site_settings_admin.c
     src/modules/browser_detection_admin/browser_detection_admin.c
+    src/modules/updates_admin/updates_admin.c
     src/modules/fonts_admin/fonts_admin.c
     src/modules/analytics/analytics.c
     src/modules/analytics/geoip.c
@@ -141,6 +143,16 @@ set(SOURCES
 )
 
 add_executable(boat-rudder ${SOURCES})
+
+# The version a build reports (`boat-rudder --version`, the startup log line):
+# the first line of ./VERSION, which the updater also installs and compares
+# (develop_docs/plans/update-system-plan.md). Changing the file reconfigures.
+set(BOAT_RUDDER_VERSION "unknown")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION")
+    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" BOAT_RUDDER_VERSION LIMIT_COUNT 1)
+endif()
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION")
+target_compile_definitions(boat-rudder PRIVATE BOAT_RUDDER_VERSION="${BOAT_RUDDER_VERSION}")
 
 target_include_directories(boat-rudder PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src

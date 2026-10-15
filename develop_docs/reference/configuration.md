@@ -67,6 +67,9 @@ wap_gateway_ips=               # listen addresses, comma-separated; empty = all
 wap_gateway_rover_port=49300   # Palm Neomar/Rover WTP framing; 0 disables
 wap_gateway_wsp_port=9200      # connectionless WSP framing; 0 disables
 wap_gateway_rate_limit=60      # requests/min per source IP; 0 = unlimited
+
+# Updates (scripts.md)
+update_repo=jpablotoledom/boat-rudder   # GitHub owner/name of the releases
 ```
 
 ---
@@ -130,6 +133,12 @@ The UDP gateway that serves epoch -1 as compiled WBXML to real WAP 1.x devices. 
 | `wap_gateway_rover_port` | int | `49300` | UDP port for the Palm Neomar/Rover 1.5 WTP framing. `0` disables it. |
 | `wap_gateway_wsp_port` | int | `9200` | UDP port for standard WAP 1.x connectionless WSP. `0` disables it. Experimental: untested on real phones. |
 | `wap_gateway_rate_limit` | int | `60` | Maximum requests answered per minute per source IP; `0` = unlimited. Exists because UDP replies are ~20× the request size, so an unlimited gateway is a traffic amplifier for spoofed sources. |
+
+### Updates
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `update_repo` | string | `jpablotoledom/boat-rudder` | GitHub repository (`owner/name`) whose releases `/dashboard/settings/updates` lists and `boat-rudder-update` installs from (its `BR_REPO` overrides it). Only `[A-Za-z0-9._-]` and one `/`; anything else is refused. |
 
 ---
 

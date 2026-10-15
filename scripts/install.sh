@@ -37,6 +37,23 @@ mkdir -p "$INSTALL_DIR"
 # while the service is running the old binary ("Text file busy" with cp).
 install -m 755 ./bin/boat-rudder "$INSTALL_DIR/boat-rudder"
 
+# The server runs scripts/image-optimizer.sh (relative to its
+# WorkingDirectory) on every media upload; without it every upload is
+# rejected with "415 - could not be processed as an image". Its tools are
+# checked too, since a missing one fails the same way.
+mkdir -p "$INSTALL_DIR/scripts"
+install -m 755 ./scripts/image-optimizer.sh "$INSTALL_DIR/scripts/image-optimizer.sh"
+# manifest.sh checks an install against its manifest ("verify") on the host;
+# boat-rudder-update updates it from signed releases, and is linked into
+# /usr/local/sbin so `sudo boat-rudder-update ...` works from anywhere.
+install -m 755 ./scripts/manifest.sh "$INSTALL_DIR/scripts/manifest.sh"
+install -m 755 ./scripts/boat-rudder-update "$INSTALL_DIR/scripts/boat-rudder-update"
+ln -sfn "$INSTALL_DIR/scripts/boat-rudder-update" /usr/local/sbin/boat-rudder-update
+for tool in magick jpegoptim gifsicle; do
+    command -v "$tool" > /dev/null 2>&1 ||
+        echo "Warning: '$tool' not found - media uploads will fail until it is installed."
+done
+
 # Every "cp -r ./dir $INSTALL_DIR/dir" below would copy INTO the existing
 # directory on a reinstall (configs/configs, html/html, ...) and update
 # nothing - hence cp -rT / per-file copies.
@@ -61,12 +78,27 @@ else
     fi
 fi
 
-# html/ is required at runtime. Merged over the installed copy: templates
-# and themes are updated, and files that only exist there - media uploaded
-# from the dashboard into html/content - are left alone.
+# html/ is required at runtime. Everything but html/content/ is merged over
+# the installed copy: templates, themes and assets are updated, and files that
+# only exist there (uploaded fonts...) are left alone. html/content/ is the
+# site's own - posts, uploads, generated QR codes - and the repository's copy
+# only sample content, so it is seeded on the first install only: copied over
+# a live site it would replace same-named files of the site with the samples.
 if [ -d ./html ]; then
     mkdir -p "$INSTALL_DIR/html"
-    cp -rT ./html "$INSTALL_DIR/html"
+    for entry in ./html/* ./html/.[!.]*; do
+        [ -e "$entry" ] || continue
+        [ "$(basename "$entry")" = "content" ] && continue
+        if [ -d "$entry" ]; then
+            cp -rT "$entry" "$INSTALL_DIR/html/$(basename "$entry")"
+        else
+            cp "$entry" "$INSTALL_DIR/html/"
+        fi
+    done
+    if [ -d ./html/content ] && [ ! -d "$INSTALL_DIR/html/content" ]; then
+        cp -rT ./html/content "$INSTALL_DIR/html/content"
+        echo "Seeded html/content/ with the sample content."
+    fi
 else
     mkdir -p "$INSTALL_DIR/html"
     echo "Warning: html/ not found. Add your retro-compatible CMS files to $INSTALL_DIR/html/"
@@ -93,6 +125,20 @@ if [ -d ./ssl ] && [ -n "$(ls -A ./ssl 2>/dev/null)" ]; then
         echo "Kept the existing ssl/ certificates."
     fi
 fi
+
+# .boat-rudder/ - what this install is (develop_docs/plans/update-system-plan.md):
+# its version, and the manifest of the system files just installed - the list
+# the updater compares against, and the only files it will ever replace or
+# delete. Written once every file is in place.
+mkdir -p "$INSTALL_DIR/.boat-rudder"
+install -m 644 ./VERSION "$INSTALL_DIR/.boat-rudder/VERSION"
+./scripts/manifest.sh create . > "$INSTALL_DIR/.boat-rudder/manifest.sha256.tmp"
+chmod 644 "$INSTALL_DIR/.boat-rudder/manifest.sha256.tmp"
+mv "$INSTALL_DIR/.boat-rudder/manifest.sha256.tmp" "$INSTALL_DIR/.boat-rudder/manifest.sha256"
+if [ -f ./scripts/minisign.pub ]; then
+    install -m 644 ./scripts/minisign.pub "$INSTALL_DIR/.boat-rudder/minisign.pub"
+fi
+echo "Installed version $(head -n1 ./VERSION) ($(wc -l < "$INSTALL_DIR/.boat-rudder/manifest.sha256") system files)."
 
 # The service appends to /var/log/boat-rudder.log forever otherwise.
 if [ -d /etc/logrotate.d ]; then

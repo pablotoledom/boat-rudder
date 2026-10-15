@@ -6,6 +6,7 @@
 #include "../../utils/read_file.h"
 #include "../../utils/template_utils.h"
 #include "../../utils/css_compat.h"
+#include "../../utils/version.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -85,7 +86,8 @@ char *site_settings_general_page(int epoch, const char *site_name, const char *e
     favicons = favicon_panels(epoch);
     if (!encoded_name || !favicons) goto cleanup;
 
-    result = render_template(page_tpl, error_html ? error_html : "", encoded_name, favicons);
+    result = render_template(page_tpl, error_html ? error_html : "", encoded_name, favicons,
+                             BOAT_RUDDER_VERSION);
 
 cleanup:
     free(page_tpl);
